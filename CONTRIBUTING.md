@@ -25,7 +25,7 @@ Thank you for your interest in contributing!
 ## Development Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Moh-albataineh/exactk-qec-decoder.git
 cd exactk-qec-decoder
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS

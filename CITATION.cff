@@ -5,7 +5,7 @@ type: software
 version: 1.0.0
 date-released: "2026-03-03"
 license: MIT
-repository-code: "https://github.com/YOUR_USERNAME/exactk-qec-decoder"
+repository-code: "https://github.com/Moh-albataineh/exactk-qec-decoder"
 authors:
   - family-names: Albataineh
     given-names: Mohammad

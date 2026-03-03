@@ -28,7 +28,7 @@ git commit -m "ExactK V1.0: iso-K hinge loss for QEC decoding
 - 80% safe yield, 0% TOPO_FAIL, 0 Do-No-Harm violations"
 
 # Add remote and push
-git remote add origin git@github.com:YOUR_USERNAME/exactk-qec-decoder.git
+git remote add origin git@github.com:Moh-albataineh/exactk-qec-decoder.git
 git branch -M main
 git push -u origin main
 ```
@@ -42,7 +42,7 @@ git push origin v1.0.0
 
 ### Step 4: Create GitHub Release
 
-1. Go to `https://github.com/YOUR_USERNAME/exactk-qec-decoder/releases/new`
+1. Go to `https://github.com/Moh-albataineh/exactk-qec-decoder/releases/new`
 2. Select tag `v1.0.0`
 3. Title: `ExactK V1.0 — Iso-K Hinge Loss for QEC Decoding`
 4. Description: copy from `CHANGELOG.md` v1.0.0 entry
@@ -66,7 +66,7 @@ git subtree split --prefix=public_release_exactk_v1 -b exactk-v1-release
 
 ```bash
 # Create new repo on GitHub first
-git remote add exactk-release git@github.com:YOUR_USERNAME/exactk-qec-decoder.git
+git remote add exactk-release git@github.com:Moh-albataineh/exactk-qec-decoder.git
 git push exactk-release exactk-v1-release:main
 ```
 
