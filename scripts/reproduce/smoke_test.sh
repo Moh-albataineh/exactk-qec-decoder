@@ -24,14 +24,14 @@ echo ""
 echo "[3/3] Selector v6 determinism check..."
 python -c "
 from qec_noise_factory.ml.ops.checkpoint_selection import select_epoch_for_seed
-import json
 
-# Synthetic epoch data (2 epochs)
+# Synthetic epoch data (3 epochs)
 epochs = [
-    {'epoch': 6, 'g1_linear_r2_cv': 0.02, 'g1_inst': 0.018, 'tg_roll': 0.05, 'slice_clean_frac': 0.6},
-    {'epoch': 7, 'g1_linear_r2_cv': 0.03, 'g1_inst': 0.022, 'tg_roll': 0.08, 'slice_clean_frac': 0.7},
+    {'epoch': 6, 'G1_aligned': 0.02, 'topo_TG': 0.05, 'slice_clean': 0.6},
+    {'epoch': 7, 'G1_aligned': 0.03, 'topo_TG': 0.08, 'slice_clean': 0.7},
+    {'epoch': 8, 'G1_aligned': 0.01, 'topo_TG': 0.06, 'slice_clean': 0.65},
 ]
-result = select_epoch_for_seed(epochs, seed=42, arm='test', selector_version='v6_drop_slice_floor')
+result = select_epoch_for_seed(epochs, drop_slice_floor=True)
 print(f'  Selected epoch: {result[\"chosen_epoch\"]}, pool: {result[\"selector_pool\"]}')
 print('  Selector v6 determinism OK')
 "

@@ -42,14 +42,14 @@ python tests/experiment_day75_holdout_d7.py \
 echo ""
 echo "[2/3] Running selector v6..."
 python scripts/run_selector_v6_from_jsonl.py \
-    --results-dir "$OUTDIR" \
+    --artifact_dir "$OUTDIR" \
     2>&1 | tee -a "$OUTDIR/run.log"
 
 echo ""
 echo "[3/3] Computing V1.0 KPIs..."
 python scripts/day75_2_compute_v1_release_kpis.py \
-    --holdout-dir "$OUTDIR" \
-    --output-dir "$OUTDIR/v1_release_closure" \
+    --artifact_dir "$OUTDIR" \
+    --out_dir "$OUTDIR/v1_release_closure" \
     2>&1 | tee -a "$OUTDIR/run.log"
 
 echo ""

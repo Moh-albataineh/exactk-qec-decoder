@@ -20,20 +20,20 @@ fi
 
 echo "[1/3] Running selector v6 on JSONL logs..."
 python scripts/run_selector_v6_from_jsonl.py \
-    --results-dir "$RESULTS_DIR"
+    --artifact_dir "$RESULTS_DIR"
 echo ""
 
 echo "[2/3] Regenerating receipts..."
 python scripts/day75_3_regenerate_receipts.py \
-    --results-dir "$RESULTS_DIR"
+    --artifact_dir "$RESULTS_DIR"
 echo ""
 
 echo "[3/3] Computing V1.0 release KPIs..."
 OUTDIR="$RESULTS_DIR/v1_release_closure"
 mkdir -p "$OUTDIR"
 python scripts/day75_2_compute_v1_release_kpis.py \
-    --holdout-dir "$RESULTS_DIR" \
-    --output-dir "$OUTDIR"
+    --artifact_dir "$RESULTS_DIR" \
+    --out_dir "$OUTDIR"
 echo ""
 
 echo "Output files:"
