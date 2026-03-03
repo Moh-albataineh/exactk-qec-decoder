@@ -1,0 +1,46 @@
+# Generated artifacts
+ml_artifacts/
+output/
+shards/
+packs/generated/
+
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Training logs (generated at runtime)
+*.jsonl
+
+# Binary data
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,18 @@
+# Core simulation
+numpy
+stim
+sinter
+pymatching
+
+# ML decoder
+torch
+scikit-learn
+
+# Utilities
+tqdm
+pyyaml
+matplotlib
+pandas
+
+# Testing
+pytest

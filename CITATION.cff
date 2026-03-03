@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "ExactK: Iso-K Hinge Loss for K-Leakage-Free QEC Decoding"
+message: "If you use this software, please cite it as below."
+type: software
+version: 1.0.0
+date-released: "2026-03-03"
+license: MIT
+repository-code: "https://github.com/YOUR_USERNAME/exactk-qec-decoder"
+authors:
+  - family-names: Albataineh
+    given-names: Mohammad
+keywords:
+  - quantum error correction
+  - surface codes
+  - machine learning decoder
+  - factor-graph neural network
+  - K-leakage mitigation
+  - iso-K ranking
+abstract: >-
+  ExactK is a production-ready ML decoder for quantum error correction
+  on surface codes. It uses iso-K hinge loss (exact syndrome-count matching)
+  to eliminate K-leakage confounding in factor-graph neural network decoders.
+  Validated on d=5 (+31.2% G1 reduction) and d=7 (+23.4% OOD generalization),
+  with a V1.0 holdout achieving +45.0% science delta, 80% safe yield,
+  and 0% topology failure on unseen seeds.
