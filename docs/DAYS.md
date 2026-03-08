@@ -1,5 +1,7 @@
 # Development Log
 
+> **Note on "Days"**: The timeline below tracks units of work, idea iterations, and conceptual milestones rather than strict calendar dates. A single "Day" might represent a specific architectural pivot, a new experiment, or a targeted fix.
+
 ## Day 1 — Sandbox Runner + Resource Limits + SQLite Metadata Store ✅
 
 **Goal**: Build a secure, reproducible execution environment for QEC noise generation.

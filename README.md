@@ -66,12 +66,11 @@ bash scripts/reproduce/smoke_test.sh
 
 ### Reproduce Key Results
 
-| Experiment | Command | Time |
-|------------|---------|------|
-| d=5 quick (2 seeds) | `bash scripts/reproduce/repro_day69_d5.sh` | ~10 min |
-| d=5 full (10 seeds) | `bash scripts/reproduce/repro_day69_d5.sh --full` | ~2 hours |
-| d=7 OOD (10 seeds) | `bash scripts/reproduce/repro_day70_d7.sh --full` | ~4 hours (GPU) |
-| Holdout (10 seeds) | `bash scripts/reproduce/repro_day75_holdout.sh --full` | ~4 hours (GPU) |
+| Experiment | Command | Time (GPU) |
+|------------|---------|------------|
+| d=5 (10 seeds) | `bash scripts/reproduce/repro_day69_d5.sh` | ~10-15 min |
+| d=7 OOD (10 seeds) | `bash scripts/reproduce/repro_day70_d7.sh` | ~4 hours |
+| Holdout (10 seeds) | `bash scripts/reproduce/repro_day75_holdout.sh` | ~4 hours |
 | Selector + KPIs | `bash scripts/reproduce/run_selector_v6.sh` | ~1 min |
 
 ---
