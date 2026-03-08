@@ -1,6 +1,6 @@
 # Current Status — QEC Noise Factory
 
-**Last updated**: Day 75.3 (2026-03-01) -- V1.0 Release Closure: Science +45.0%, Safe Yield 80%, KPI-A (Prod tg_roll=0.0664 vs Ctrl=0.0800, -17%), KPI-B leaky +15.1% (83% wins), 0 violations. Selected-G1 Delta% deprecated (asymmetric selector). Receipt schema fixed (extract_required_float).
+**Last updated**: Day 75.3 (2026-03-01) -- V1.0 Release Closure: Science +45.0%, Safe Yield 80%, KPI-A (Prod tg_roll=0.0664 vs Ctrl=0.0800, -17%), KPI-B leaky +15.1% (83% wins), 0 violations. Selected-G1 Delta% deprecated (asymmetric selector). Receipt schema fixed (extract_required_float). Cross-platform reproduction is documented as tolerance-based; canonical paper numbers remain the reference.
 
 ## What We're Building
 

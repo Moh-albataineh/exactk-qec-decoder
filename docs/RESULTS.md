@@ -1149,3 +1149,14 @@ Dual-cap violations: 0 ✅
 
 **KPI-A note**: Prod CLEAN tg_roll (-17% vs Control) reflects that both arms achieve strong topology once clean; Control edges Prod slightly. This is informational only.
 
+---
+
+## Reproduction Policy Note
+
+The results in this document are **canonical** — produced in the validated reference environments documented in [`docs/REPRO_POLICY.md`](REPRO_POLICY.md). Key points:
+
+- **Day 69 (d=5)** canonical results were produced on CPU (Intel i7-14700HX, Windows). GPU re-runs produce qualitatively consistent but numerically different results due to different floating-point reduction order and RNG streams.
+- **Day 70/75 (d=7)** canonical results were produced on GPU (NVIDIA RTX PRO 6000, RunPod). Re-runs on the same GPU model with deterministic CUDA settings (`cudnn.deterministic=True`) should closely match. Different GPU architectures may show variance.
+- The **scientific claims** (ExactK effectiveness, generalization, safety) are validated by: (1) canonical results above, (2) robust safety invariants (zero topology collapses, 100% alignment, no NaN/Inf across all experiments), and (3) independent holdout validation (Day 75, unseen seeds).
+- Reproduction runs should be evaluated using the acceptance criteria in [`docs/REPRO_POLICY.md`](REPRO_POLICY.md), not by exact decimal comparison.
+

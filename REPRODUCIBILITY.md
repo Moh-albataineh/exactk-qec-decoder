@@ -46,28 +46,22 @@ All experiments use deterministic seeds. Results are reproducible within the sam
 
 ## Reproducing Results
 
-### Quick Validation (d=5, 2 seeds, ~10 min)
+### d=5 Reproduction (10 seeds, ~10-15 min GPU / ~3 hours CPU)
 
 ```bash
 bash scripts/reproduce/repro_day69_d5.sh
 ```
 
-### Full d=5 Reproduction (10 seeds, ~2 hours)
+### d=7 OOD Reproduction (requires GPU, ~20-30 min)
 
 ```bash
-bash scripts/reproduce/repro_day69_d5.sh --full
+bash scripts/reproduce/repro_day70_d7.sh
 ```
 
-### d=7 OOD Reproduction (requires GPU, ~4 hours)
+### Holdout Reproduction (requires GPU, ~20-30 min)
 
 ```bash
-bash scripts/reproduce/repro_day70_d7.sh --full
-```
-
-### Holdout Reproduction (requires GPU, ~4 hours)
-
-```bash
-bash scripts/reproduce/repro_day75_holdout.sh --full
+bash scripts/reproduce/repro_day75_holdout.sh
 ```
 
 ### Post-Training KPI Computation
@@ -76,14 +70,46 @@ bash scripts/reproduce/repro_day75_holdout.sh --full
 bash scripts/reproduce/run_selector_v6.sh
 ```
 
-## Floating-Point Determinism
+## Determinism and Cross-Platform Variance
 
-Results are deterministic within the same environment. Cross-platform differences may cause minor floating-point divergence (< 1% relative) due to:
-- Different CUDA versions
-- Different CPU architectures (x86 vs ARM)
-- PyTorch version differences
+### Deterministic Settings
 
-The **qualitative conclusions** (PASS/FAIL, direction of improvement) are robust across platforms.
+All experiment scripts enforce:
+
+```python
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+```
+
+These ensure **repeated runs on the same hardware** produce identical results. They do **not** guarantee bit-exact agreement across different GPUs, CUDA versions, or CPU vs GPU execution.
+
+### Canonical vs Reproduction Results
+
+The results in `RESULTS.md` and `DAYS.md` are **canonical** — produced in the validated reference environment:
+
+- **Day 69 (d=5)**: Intel i7-14700HX (CPU), Windows, PyTorch CPU
+- **Day 70/75 (d=7)**: NVIDIA RTX PRO 6000, RunPod Ubuntu, PyTorch CUDA 12.4
+
+Cross-platform reproduction runs may differ because:
+- GPU vs CPU execution changes floating-point reduction order
+- Different GPU architectures select different cuDNN algorithms
+- Sparse/GNN message-passing involves non-associative sums
+- CUDA/PyTorch version differences change internal implementations
+
+### Reproduction Acceptance Policy
+
+A reproduction is considered **successful** if it preserves:
+
+| Criterion | Required |
+|-----------|----------|
+| Same overall verdict (PASS/PARTIAL/FAIL) | ✅ Yes (or within one tier) |
+| Same safety conclusion (0 collapses, alignment pass, no NaN/Inf) | ✅ Yes |
+| Same best arm | ✅ Yes |
+| Qualitatively similar effect size (same direction, similar magnitude) | ✅ Yes |
+| Exact decimal match on all metrics | ❌ Not required |
+| Identical per-seed G1 values | ❌ Not required |
+
+See [`docs/REPRO_POLICY.md`](docs/REPRO_POLICY.md) for the full policy.
 
 ## Artifact Policy
 
