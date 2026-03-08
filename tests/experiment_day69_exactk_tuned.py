@@ -26,6 +26,12 @@ if _proj_root not in sys.path:
 import numpy as np
 import torch
 
+# ── Deterministic CUDA settings for reproducibility ─────────────────
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 # ── Config ──────────────────────────────────────────────────────────────
 
 ARMS = {
@@ -76,13 +82,14 @@ def compute_rzk_y1_probe(model, probe_set, min_count=GATE_MIN_Y1_COUNT):
     """Compute corr(Z_g1, K | Y=1) on ProbeSet in eval mode."""
     from qec_noise_factory.ml.bench.density_baseline import compute_syndrome_count
 
+    device = next(model.parameters()).device
     model.eval()
     with torch.no_grad():
         split = model.forward_split(
-            probe_set['det_feats'], probe_set['err_feats'],
-            probe_set['ei_d2e'], probe_set['ei_e2d'],
-            error_weights=probe_set.get('err_w'),
-            observable_mask=probe_set.get('obs_mask'))
+            probe_set['det_feats'].to(device), probe_set['err_feats'].to(device),
+            probe_set['ei_d2e'].to(device), probe_set['ei_e2d'].to(device),
+            error_weights=probe_set.get('err_w').to(device),
+            observable_mask=probe_set.get('obs_mask').to(device))
         z_g1 = split['logit_residual_norm'].detach().cpu().numpy().ravel()
         K = split.get('K')
         if K is not None:
@@ -231,9 +238,17 @@ def train_one_epoch(model, data, K_train, train_Y_2d, optimizer, focal,
                     iso_loss_fn, iso_active, seed, epoch,
                     batch_size=BATCH_SIZE):
     from qec_noise_factory.ml.bench.density_scrambler import scramble_detector_syndromes
-    train_Y_t = torch.from_numpy(train_Y_2d)
+    device = next(model.parameters()).device
+    train_Y_t = torch.from_numpy(train_Y_2d).to(device)
     model.train()
     model._current_epoch = epoch
+
+    err_feats_d = data["err_feats"].to(device)
+    ei_d2e_d = data["ei_d2e"].to(device)
+    ei_e2d_d = data["ei_e2d"].to(device)
+    err_w_d = data["err_w"].to(device)
+    obs_mask_d = data["obs_mask"].to(device)
+
     ep_perm = torch.randperm(data["det_train"].shape[0])
 
     ep_loss = 0.0
@@ -253,12 +268,12 @@ def train_one_epoch(model, data, K_train, train_Y_2d, optimizer, focal,
     for start in range(0, data["det_train"].shape[0], batch_size):
         end = min(start + batch_size, data["det_train"].shape[0])
         bi = ep_perm[start:end]
-        det_batch = data["det_train"][bi]
+        det_batch = data["det_train"][bi].to(device)
 
-        split = model.forward_split(det_batch, data["err_feats"],
-                                    data["ei_d2e"], data["ei_e2d"],
-                                    error_weights=data["err_w"],
-                                    observable_mask=data["obs_mask"])
+        split = model.forward_split(det_batch, err_feats_d,
+                                    ei_d2e_d, ei_e2d_d,
+                                    error_weights=err_w_d,
+                                    observable_mask=obs_mask_d)
 
         bce_loss = focal(split['logit_final'], train_Y_t[bi])
         if torch.isnan(bce_loss) or torch.isinf(bce_loss):
@@ -320,10 +335,10 @@ def train_one_epoch(model, data, K_train, train_Y_2d, optimizer, focal,
         else:
             batch_count += 1
 
-        det_scr = scramble_detector_syndromes(det_batch, seed=seed + (epoch - 1) * 1000 + start)
+        det_scr = scramble_detector_syndromes(det_batch.cpu(), seed=seed + (epoch - 1) * 1000 + start).to(device)
         null_result = model.compute_centered_nullspace_loss(
-            det_scr, data["err_feats"], data["ei_d2e"], data["ei_e2d"],
-            error_weights=data["err_w"], observable_mask=data["obs_mask"])
+            det_scr, err_feats_d, ei_d2e_d, ei_e2d_d,
+            error_weights=err_w_d, observable_mask=obs_mask_d)
         loss = loss + 2.0 * null_result['loss']
 
         if K_batch is not None:
@@ -370,16 +385,23 @@ def evaluate_topology(model, data):
     from qec_noise_factory.ml.diagnostics.exact_k_slice import compute_exact_k_slice_auroc
     from qec_noise_factory.ml.metrics.ranking import compute_auroc
 
+    device = next(model.parameters()).device
+    err_feats_d = data["err_feats"].to(device)
+    ei_d2e_d = data["ei_d2e"].to(device)
+    ei_e2d_d = data["ei_e2d"].to(device)
+    err_w_d = data["err_w"].to(device)
+    obs_mask_d = data["obs_mask"].to(device)
+
     model.eval()
     with torch.no_grad():
         split_clean = model.forward_split(
-            data["det_test"], data["err_feats"], data["ei_d2e"], data["ei_e2d"],
-            error_weights=data["err_w"], observable_mask=data["obs_mask"])
+            data["det_test"].to(device), err_feats_d, ei_d2e_d, ei_e2d_d,
+            error_weights=err_w_d, observable_mask=obs_mask_d)
         z_clean = split_clean['logit_residual_norm'].detach().cpu().numpy().ravel()
-        det_scr = scramble_detector_syndromes(data["det_test"], seed=99999)
+        det_scr = scramble_detector_syndromes(data["det_test"], seed=99999).to(device)
         split_scr = model.forward_split(
-            det_scr, data["err_feats"], data["ei_d2e"], data["ei_e2d"],
-            error_weights=data["err_w"], observable_mask=data["obs_mask"])
+            det_scr, err_feats_d, ei_d2e_d, ei_e2d_d,
+            error_weights=err_w_d, observable_mask=obs_mask_d)
         z_scr = split_scr['logit_residual_norm'].detach().cpu().numpy().ravel()
 
     y = data["test_Y"].ravel()
@@ -488,6 +510,7 @@ def run_experiment(seeds):
         for arm_name, arm_cfg in ARMS.items():
             print(f"\n  --- {arm_name} (seed={seed}) ---")
             model, K_train, train_Y_2d = build_model(data, seed)
+            model = model.to(DEVICE)
             from qec_noise_factory.ml.models.factor_graph import FocalLoss
             focal = FocalLoss(gamma=2.0, pos_weight=None)
             optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

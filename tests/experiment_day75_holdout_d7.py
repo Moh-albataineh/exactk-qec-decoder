@@ -31,6 +31,11 @@ if _proj_root not in sys.path:
 import numpy as np
 import torch
 
+# ── Deterministic CUDA settings for reproducibility ─────────────────
+if torch.cuda.is_available():
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 # ── Memory telemetry ─────────────────────────────────────────────────
 
