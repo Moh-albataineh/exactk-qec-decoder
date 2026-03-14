@@ -1,0 +1,164 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 4: Experiments and Results
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Experiments and Results}
+\label{sec:experiments}
+
+\subsection{Setup}
+
+\paragraph{Data.} Surface code circuits at $d \in \{5, 7\}$, $p = 0.04$, $X$~basis, correlated crosstalk noise ($c{=}0.5$), generated via Stim~\cite{PLACEHOLDER_stim}. Training samples: $N_{\text{train}}{=}2048$ for $d{=}5$ experiments, $N_{\text{train}}{=}4096$ for $d{=}7$. An independent probe set of $N_{\text{probe}}{=}4096$ samples (deterministic seed) was used for all $G_1$ evaluations.
+
+\paragraph{Arms.} Days~69 and 70 use three arms $\times$ 10~seeds: (A)~Control (no iso-$K$ loss, $\lambda{=}0$), (B)~ExactK with production hyperparameters, and (C)~a variant arm specified per experiment. Day~75 (holdout) uses two arms $\times$ 10~seeds: Control and ExactK only. The Day~67 $\Delta K$ ablation (Section~\ref{sec:ablation_dk}) is a separate Phase-1 falsification study on 4~hard seeds.
+
+\paragraph{Seeds.} $d{=}5$ and $d{=}7$ experiments used seeds $\{47000, 49000, 49200, 50000, 51000, 52000, 53000, 54000, 55000, 56000\}$. The holdout experiment used seeds $\{60000, \ldots, 60009\}$, which were never used during development.
+
+\paragraph{Hardware.} The $d{=}5$ canonical results were produced on CPU (Intel i7-14700HX, Windows~11). The $d{=}7$ canonical results were produced on GPU (NVIDIA RTX PRO 6000, 96\,GB VRAM, RunPod Ubuntu~24.04). Cross-platform reproduction may yield numerically different but qualitatively consistent results due to floating-point non-determinism (Appendix~\ref{app:repro}).
+
+\paragraph{Evaluation.} The primary metric is the epoch-median~$G_1$: for each seed, the median of $G_1$ across active-phase epochs ($\geq 6$), then the median across seeds. The improvement $\Delta$ is computed as $(G_{1,\text{ctrl}} - G_{1,\text{prod}}) / G_{1,\text{ctrl}}$, where positive values indicate reduced leakage. We report paired bootstrap 95\% CIs for the median relative improvement using percentile intervals over seed-level paired resamples (100,000 resamples, random seed~42). For Day~69 and Day~70 experiment artifacts, the historical field name \texttt{G1\_raw\_probe} was mapped to the canonical \texttt{G1\_aligned} metric via the repository's \texttt{\_normalize\_epoch} compatibility function; Day~75 used \texttt{G1\_aligned} natively.
+
+\subsection{Experiment 1: $d{=}5$ Primary Validation}
+
+\begin{table}[htbp]
+\caption{Aggregate results at $d{=}5$ (10~seeds, $N_{\text{train}}{=}2048$, epochs $\geq 6$).}
+\label{tab:d5}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+Arm & Median $G_1$ & $\Delta$ vs Control & Topo.\ collapses \\
+\hline
+Control & 0.0154 & --- & 0/10 \\
+\textbf{ExactK} & \textbf{0.0106} & \textbf{+31.2\%} & \textbf{0/10} \\
+ExactK Gated & 0.0117 & +24.0\% & 0/10 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+A paired bootstrap over the 10~seed pairs gives a 95\% CI of $[-46.3\%, 61.2\%]$ for the median relative improvement. Per-seed results are shown in Fig.~\ref{fig:d5}. The response is strongly heterogeneous: five seeds show substantial reductions (49000: $+71.9\%$, 53000: $+50.1\%$, 56000: $+48.5\%$, 54000: $+39.0\%$, 55000: $+18.1\%$), while three seeds regress materially (49200: $-155.6\%$, 52000: $-40.7\%$, 47000: $-36.2\%$). The point estimate nevertheless crosses the pre-specified $30\%$ threshold. The Gated arm, which adaptively suppressed $\lambda$ based on an intra-class $z$--$K$ correlation monitor, achieved $+24.0\%$---the gate correctly protected adversarial seeds but also throttled the signal on seeds that benefited from ranking pressure.
+
+Alignment invariant: $360/360$ measurements passed. Zero topology collapses. No NaN or Inf values detected.
+
+\begin{figure*}
+\centering
+\includegraphics[width=0.75\textwidth]{figure_3_d5.pdf}
+\caption{Per-seed epoch-median $G_1$ values for Control, ExactK, and ExactK (Gated) at $d{=}5$, highlighting seed~49200 as the canonical adversarial case in the primary validation suite.}
+\label{fig:d5}
+\end{figure*}
+
+\subsection{Experiment 2: $d{=}7$ Out-of-Distribution}
+
+To test whether ExactK's hyperparameters transfer across code distances, we ran the identical production configuration at $d{=}7$ ($N_{\text{train}}{=}4096$, $B{=}256$ effective via gradient accumulation, $M{=}512$ max pairs).
+
+\begin{table}[htbp]
+\caption{Aggregate results at $d{=}7$ (10~seeds, same hyperparameters as $d{=}5$).}
+\label{tab:d7}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+Arm & Median $G_1$ & $\Delta$ vs Control & Topo.\ collapses \\
+\hline
+Control & 0.0274 & --- & 0/10 \\
+\textbf{ExactK} & \textbf{0.0210} & \textbf{+23.4\%} & \textbf{0/10} \\
+ExactK EarlyCutoff & 0.0260 & +5.1\% & 0/10 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+The $d{=}5$ hyperparameters transfer to $d{=}7$ without modification, achieving a $23.4\%$ $G_1$ reduction (paired bootstrap 95\% CI: $[-51.4\%, 51.4\%]$), which still exceeds the pre-specified $20\%$ out-of-distribution threshold at the point-estimate level. The regression from $31.2\%$ to $23.4\%$ may reflect the substantially larger representation space at $d{=}7$ (336 vs 120~detectors) and other scaling-related factors; we do not claim a definitive explanation.
+
+Seed-level adversariality proved distance-dependent (Fig.~\ref{fig:d7}): seed~49200 was strongly adversarial at $d{=}5$ ($-155.6\%$) but beneficial at $d{=}7$ ($+60.8\%$). Conversely, seeds~51000 ($-40.4\%$) and 55000 ($-584.1\%$) were adversarial at $d{=}7$ but not at $d{=}5$. The EarlyCutoff arm, which set $\lambda{=}0$ after epoch~8, achieved only $+5.1\%$---the hard cutoff removed useful late-epoch ranking signal that the gradual decay ($0.85^{(\text{ep}-8)}$) preserves.
+
+Alignment: $360/360$ PASS. Zero topology collapses. No NaN/Inf.
+
+\begin{figure*}
+\centering
+\includegraphics[width=0.75\textwidth]{figure_4_d7_broken_axis.pdf}
+\caption{Per-seed epoch-median $G_1$ values for Control, ExactK, and ExactK (EarlyCutoff) at $d{=}7$. A broken $y$-axis is used to preserve visibility of non-outlier seeds while retaining the large 53k outlier in the same panel.}
+\label{fig:d7}
+\end{figure*}
+
+\subsection{Experiment 3: Holdout Validation}
+
+We evaluated ExactK on 10~holdout seeds ($60000$--$60009$) that were never used during any development iteration, at $d{=}7$, $p{=}0.04$.
+
+\begin{table}[htbp]
+\caption{Holdout KPIs (unseen seeds, $d{=}7$).}
+\label{tab:holdout}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+KPI & Value & Target & Status \\
+\hline
+Science $\Delta$ (epoch-median $G_1$) & $+45.0\%$ & $\geq 20\%$ & Pass \\
+Safe Yield (Prod CLEAN) & 80\% (8/10) & $\geq 80\%$ & Pass \\
+TOPO\_FAIL & 0/10 & $\leq 10\%$ & Pass \\
+KPI-B: Leaky cohort & $+15.1\%$ (83\% wins) & $> 0$ & Pass \\
+Do-No-Harm violations & 0 & 0 & Pass \\
+Max spike $\delta$ (CLEAN) & 0.0063 & $< 0.015$ & Pass \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+The canonical holdout epoch-median medians are $0.035585$ for Control and $0.019559$ for ExactK, corresponding to a $+45.0\%$ science delta (Fig.~\ref{fig:holdout}). A paired bootstrap over the 10~holdout seed pairs gives a 95\% CI of $[-31.9\%, 60.7\%]$. Because the holdout seeds were reserved throughout development, this result substantially reduces concern about seed-selection bias. However, it validates within the same physical regime ($d{=}7$, $p{=}0.04$, $X$~basis, correlated crosstalk noise). The canonical Day~75 result was produced in the validated reference environment documented by the project reproduction policy. A separate cross-platform reproduction run on different hardware produced a smaller $+12.4\%$ science delta, while preserving the core safety conclusions (zero topology collapses, 240/240 alignment checks passing, and zero Do-No-Harm violations); the selector-oriented deployment KPIs also shifted numerically across environments (for example, safe yield changed from the canonical 80\% to 90\% in that reproduction). We therefore treat the Day~75 canonical tables as the authoritative point estimates for the paper and the reproduction run as a robustness check on directional efficacy and safety rather than as a replacement source of headline numbers. Cross-regime generalization---to other error rates, noise models, bases, or code distances beyond $d{=}7$---remains untested.
+
+Alignment: $240/240$ PASS. Zero topology collapses. No NaN/Inf.
+
+\begin{figure*}
+\centering
+\includegraphics[width=0.75\textwidth]{figure_5_holdout.pdf}
+\caption{Per-seed epoch-median $G_1$ values for the unseen holdout seeds 60000--60009 under Control and ExactK.}
+\label{fig:holdout}
+\end{figure*}
+
+\subsection{Ablation: ExactK vs NearK}
+\label{sec:ablation_dk}
+
+This ablation tests the necessity of exact $K$ matching ($\Delta K{=}0$) against the relaxed variant ($|\Delta K| \leq 1$), which yields more pairs per batch but reintroduces inter-bin density confounding.
+
+\begin{table}[htbp]
+\caption{$\Delta K$ ablation (4~hard seeds, $d{=}5$, $N_{\text{train}}{=}2048$).}
+\label{tab:ablation_dk}
+\begin{ruledtabular}
+\begin{tabular}{lllll}
+Arm & $\Delta K$ & Median $G_1$ & $\Delta$ vs Control & Topology \\
+\hline
+Control & --- & 0.0224 & --- & OK \\
+ExactK & 0 & 0.0112 & $+50.0\%$ & OK (all seeds) \\
+NearK & 1 & 0.0573 & $-155.0\%$ (worse) & Collapse (seed 53k) \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+NearK not only failed to improve over control but dramatically increased leakage and caused topology collapse on seed~53000. The result confirms that adjacent-$K$ pairing reintroduces density confounding: the model can satisfy the hinge margin on $\Delta K{=}1$ pairs by exploiting the systematic error-rate difference between adjacent bins rather than learning spatial topology.
+
+\subsection{Ablation: Margin and Decay Schedule}
+\label{sec:ablation_margin}
+
+\begin{table}[htbp]
+\caption{Margin calibration ($d{=}5$, $N_{\text{train}}{=}2048$, 10~seeds).}
+\label{tab:ablation_margin}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+Configuration & Margin & Decay & Median $G_1$ $\Delta$ \\
+\hline
+Day 68 (Base) & 0.50 & None & $+26.6\%$ \\
+Day 69 (Tuned) & 0.30 & $0.85^{(\text{ep}-8)}$ & $+31.2\%$ \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+Reducing the margin from $0.50$ to $0.30$ appears to have been the primary driver, increasing the median improvement by approximately 5~percentage points. The $\lambda$ decay schedule appears to have contributed additional late-epoch stability by reducing ranking pressure after epoch~8. Both hyperparameters were hand-tuned for $d{=}5$, $p{=}0.04$.
+
+\subsection{Safety Invariants}
+
+\begin{table}[htbp]
+\caption{Safety summary across all ExactK experiments.}
+\label{tab:safety}
+\begin{ruledtabular}
+\begin{tabular}{lllll}
+Experiment & Alignment & Topo.\ collapses & NaN/Inf & Seeds \\
+\hline
+$d{=}5$ (Day 69) & 360/360 & 0 & 0 & 10 \\
+$d{=}7$ OOD (Day 70) & 360/360 & 0 & 0 & 10 \\
+Holdout (Day 75) & 240/240 & 0 & 0 & 10 \\
+\textbf{Total} & \textbf{960/960} & \textbf{0} & \textbf{0} & \textbf{30} \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}

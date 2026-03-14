@@ -1,0 +1,74 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 3: Method — ExactK Iso-K Hinge Loss
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Method: ExactK Iso-$K$ Hinge Loss}
+\label{sec:method}
+
+\subsection{Motivation: Why Global Decorrelation Fails}
+\label{sec:prior_mitigation}
+
+A natural approach to reducing K-leakage is to penalize the global dependence between $z$ and $K$---for example, by adding $\lambda \cdot \Corr(z, K)^2$ to the training loss. Our experiments with this and related global methods (Sec.~\ref{sec:prior_attempts}, Table~\ref{tab:families}) revealed a fundamental obstacle: syndrome count~$K$ is \emph{physically meaningful} in QEC\@. Higher $K$ genuinely indicates more errors, so $z$ and $K$ share legitimate covariance that carries topology-relevant information. A global penalty cannot distinguish this physics-linked covariance from shortcut dependence, and applying it aggressively enough to reduce $G_1$ consistently damages the topology signal.
+
+This motivates a different strategy: rather than penalizing the global $z$--$K$ relationship, restrict all comparisons to samples with identical~$K$, so that the auxiliary training signal carries no within-pair $K$ variation by construction.
+
+\subsection{Algorithm}
+
+ExactK is an auxiliary hinge-margin ranking loss that operates on pairs of samples with identical syndrome count and opposite labels. Given a training batch with residual logits $z \in \mathbb{R}^B$, syndrome counts $K \in \mathbb{Z}^B$, and labels $Y \in \{0,1\}^B$:
+
+\begin{enumerate}
+\item \textbf{Partition} the batch into positive ($\mathcal{P} = \{i : Y_i = 1\}$) and negative ($\mathcal{N} = \{j : Y_j = 0\}$) index sets.
+\item \textbf{Mine exact-$K$ pairs}: $\mathcal{S} = \{(i,j) : i \in \mathcal{P},\; j \in \mathcal{N},\; K_i = K_j\}$.
+\item \textbf{Subsample} if $|\mathcal{S}| > M$: draw $M$ pairs uniformly at random.
+\item \textbf{Compute hinge loss}:
+\begin{equation}
+\mathcal{L}_{\text{iso}} = \frac{\lambda_{\text{eff}}}{|\mathcal{S}'|} \sum_{(i,j) \in \mathcal{S}'} \max\!\bigl(0,\; m - (z_i - z_j)\bigr),
+\end{equation}
+where $\mathcal{S}'$ denotes the (sub)sampled pairs, $m$~is the hinge margin, and $\lambda_{\text{eff}}$ follows a schedule:
+\begin{widetext}
+\begin{equation}
+\lambda_{\text{eff}} = \begin{cases} 0 & \text{if epoch} \leq 5 \;\text{(warmup)} \\ \lambda & \text{if } 5 < \text{epoch} \leq 8 \\ \lambda \cdot 0.85^{(\text{epoch} - 8)} & \text{if epoch} > 8 \end{cases}
+\end{equation}
+\end{widetext}
+\end{enumerate}
+
+The total training loss is $\mathcal{L} = \mathcal{L}_{\text{focal}} + \mathcal{L}_{\text{iso}}$, where $\mathcal{L}_{\text{focal}}$ is the focal loss~\cite{PLACEHOLDER_focal_loss} ($\gamma{=}2$) on the full batch.
+
+\paragraph{Structural property.} Because every pair $(i,j) \in \mathcal{S}$ satisfies $K_i = K_j$, there is no within-pair $K$ variation. Ranking improvements under $\mathcal{L}_{\text{iso}}$ therefore cannot be explained by pairwise $K$ differences---only by features orthogonal to $K$ within each bin. This property holds by construction and does not depend on model architecture or training dynamics. We note, however, that the main loss $\mathcal{L}_{\text{focal}}$ still operates on all samples and can learn $K$-dependent features; ExactK constrains only the auxiliary ranking channel.
+
+\subsection{Why $\Delta K = 0$ Is Essential}
+
+We tested a relaxed variant, NearK ($|\Delta K| \leq 1$), which allows pairing between adjacent $K$ bins and yields approximately $2.6{\times}$ more pairs per batch (${\sim}123$ vs ${\sim}47$ at $d{=}5$, $B{=}64$). Despite the higher pair density, NearK performed dramatically worse than control in aggregate ($-155\%$ median~$G_1$) and caused topology collapse on seed~53000 (Section~\ref{sec:ablation_dk}). The reason is that adjacent $K$ bins have systematically different error probabilities, so $\Delta K{=}1$ pairs reintroduce the density confound: the model can satisfy the hinge margin by learning to predict ``higher $K$ implies higher error risk'' rather than learning spatial topology.
+
+This ablation is the paper's central falsification result. It demonstrates that the strict $\Delta K{=}0$ constraint is not merely conservative---it is necessary for the mechanism's reliability.
+
+\subsection{Pair Density}
+
+A potential concern with exact-$K$ matching is pair sparsity. At extreme $K$ values (very low or very high syndrome count), few samples share the same~$K$, yielding zero pairs in those bins. In the Day~67 hard-seed ablation at $d{=}5$ with batch size $B{=}64$, ExactK produced ${\sim}47$ pairs per batch on average, versus ${\sim}123$ for NearK, with 100\% batch coverage (every batch contained at least one valid pair). The ranking signal is therefore concentrated in the mid-$K$ regime where most samples cluster, and this proved sufficient for reliable $G_1$ reduction. At $d{=}7$, the pair budget was increased to $M{=}512$ to compensate for the larger training setup.
+
+\subsection{Production Hyperparameters}
+
+\begin{table}[htbp]
+\caption{ExactK production configuration.}
+\label{tab:hyperparams}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Parameter & Value & Notes \\
+\hline
+$\Delta K$ & 0 & Exact $K$ matching \\
+$\lambda$ & 0.10 & Iso-$K$ loss weight \\
+$m$ & 0.30 & Hinge margin (see Section~\ref{sec:ablation_margin}) \\
+Decay & $0.85^{(\text{ep}-8)}$ for ep $> 8$ & Late-epoch pressure reduction \\
+$M$ & 256 ($d{=}5$) / 512 ($d{=}7$) & Max pairs per batch \\
+Warmup & 5 epochs & $\lambda_{\text{eff}}{=}0$ during base learning \\
+Batch std. & Off (raw $z$) & See below \\
+Epochs & 12 & 5 warmup + 7 active \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\paragraph{On batch standardization.} An alternative formulation standardizes $z$ before computing the hinge: $z' = (z - \bar{z}) / \sg(\hat{\sigma}_z)$, where $\sg$ denotes stop-gradient on the scale. This was tested as the SafeStd arm in Day~68. Standardization reduced aggregate improvement from $+26.6\%$ (raw~$z$) to approximately $0\%$, indicating that the magnitude of~$z$---not just its rank ordering---carries informative structure for the iso-$K$ objective. The production configuration therefore operates on raw~$z$.
+
+\subsection{Scope and Non-Claims}
+
+ExactK does not guarantee zero K-leakage. It reduces $G_1$ by $31$--$45\%$ on median in the tested regimes, with a minority of seeds showing increased leakage (Section~\ref{sec:adversarial}). It does not modify the model architecture, does not perform gradient surgery, and does not prevent the main loss from learning $K$-dependent features. The $G_1$ metric captures linear leakage; nonlinear leakage remains unmeasured by the current probe and is not directly targeted by ExactK.

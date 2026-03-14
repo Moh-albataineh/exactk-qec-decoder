@@ -1,0 +1,366 @@
+% ══════════════════════════════════════════════════════════════════════
+% Appendices A–D
+% ══════════════════════════════════════════════════════════════════════
+
+\appendix
+
+% ──────────────────────────────────────────────────────────────────────
+\section{Detailed Negative Results}
+\label{app:negative}
+
+The following expands Table~\ref{tab:families} with per-mechanism development-day references and specific failure observations. The 14~mechanisms are grouped into the five canonical families. Mechanism numbering below follows development chronology within each family.
+
+\subsection{Global Regularization / Decorrelation (3 mechanisms)}
+
+\paragraph{Mechanism 1 --- GRL adversary (Days 44--45).} A gradient reversal layer was applied to the $z$ representation to adversarially remove $K$-information. At the original GRL strength (Day~44), the adversarial pressure caused topology collapse: $\overline{\SliceC} = 0.451$, indistinguishable from random (${\sim}0.50$). Reducing the GRL $\lambda$ (Day~45) preserved topology ($\TG = +0.026$) but failed to achieve a reliable topology--leakage tradeoff: $G_1 = 0.035$ remained comparable to the control baseline. At no tested $\lambda$ did the GRL simultaneously preserve topology and reduce leakage below control.
+
+\paragraph{Mechanism 2 --- $\Corr(z, K)^2$ leakage penalty (Day 46).} A squared Pearson correlation penalty was added to the training loss. The penalty term diverged in magnitude: the scrambler norm reached $\|\mathrm{scr}\| = 2.1$ versus control $0.06$, indicating the loss amplified rather than suppressed the $K$-correlated component.
+
+\paragraph{Mechanism 3 --- Decorrelation with hysteresis gating (Day 66).} A refined version of the correlation penalty, gated by a hysteresis controller that activated the penalty only when $|\Corr(z, K)|$ exceeded a threshold. The gating made the mechanism safe (zero topology collapses) but underpowered: $+13.6\%$ median $G_1$ reduction, below the $30\%$ PASS threshold.
+
+\subsection{Null-Space Alignment (4 mechanisms)}
+
+\paragraph{Mechanism 4 --- Null-space + multi-gate pipeline (Day 47).} A loss encouraging the residual to lie in the null space of~$K$, combined with a pipeline of 6~gate conditions (G1--G6). Achieved 5/6 passes on seed~47000 but failed G4 ($\|\mathrm{scr}\| = 0.20 > 0.10$ threshold) and failed outright on seeds~49000 and 49200. The mechanism was fundamentally seed-dependent.
+
+\paragraph{Mechanism 5 --- Normalizer gaming fix (Day 48).} The Day~47 pipeline was found to have a normalizer gaming exploit: applying KCS to the scrambled residual introduced a systematic $-1.0$ offset (because $\mu_K[\text{bin}]$ is computed on the unscrambled data). Reverting to raw~$z$ for the null-space loss fixed the offset but rendered the null-space mechanism inert.
+
+\paragraph{Mechanism 6 --- Bias-free head + EMA centering (Day 49).} Removing all bias terms and replacing batch normalization with EMA-based centering caused catastrophic $\tanh$ saturation: the scrambler norm exploded to $36$--$297$, rendering the model non-functional.
+
+\paragraph{Mechanism 7 --- Baseline-centered null-space (Day 50).} A centering scheme subtracting the per-$K$-bin baseline from~$z$ before computing the null-space loss. Achieved 6/6 gates on seed~47000 but failed on seeds~49000 and 49200 with the same configuration. The root cause was that the optimal centering offset was seed-specific.
+
+\subsection{K-Orthogonalization (5 mechanisms)}
+
+\paragraph{Mechanism 8 --- Controller-based $\sigma$-EMA phases (Days 51--54).} An adaptive controller governed the $\lambda$ schedule for K-correction based on an EMA of the residual standard deviation. The controller entered a failure loop: $\sigma \to \sigma_{\mathrm{floor}}$ (sigma collapse), followed by $G_1$ oscillation between $0$ and $0.6$ as the controller alternated between aggressive and passive phases. No stable operating point was found across 4~iterations.
+
+\paragraph{Mechanism 9 --- Per-batch OLS K-orthogonalization (Day 56).} The linear regression coefficient $\beta$ (regressing $z$ on $K$) was estimated per batch and subtracted: $z' = z - \beta K$. At batch size $B{=}64$, the $\beta$ estimate was catastrophically noisy: $\beta = 129$ on one batch, causing loss $= 1.0 \times 10^{160}$ and numerical divergence.
+
+\paragraph{Mechanism 10 --- Safeguarded K-ortho (Day 57).} Caps ($|\beta| \leq 1.0$), floors ($\sigma_K \geq 0.1$), and an activity gate ($|\hat{r}| \geq 0.05$) were added to prevent divergence. The gate was too restrictive: $27\%$ of epochs were classified as NO\_OP ($\beta \approx 0.002$), and the active epochs produced negligible correction.
+
+\paragraph{Mechanism 11 --- EMA cross-epoch K-ortho with global gate (Day 58).} A global activity gate required $R^2_{\mathrm{global}} \geq 0.10$ before applying any correction. The global $R^2$ hovered at ${\sim}0.01$---well below threshold---because the density-residual decomposition had already removed most of the coarse $K$-dependence. The gate never opened; $100\%$ of epochs were NO\_OP.
+
+\paragraph{Mechanism 12 --- Frozen $\beta$ from OrthoStatSet (Day 59).} A dedicated calibration dataset (OrthoStatSet) was used to estimate $\beta$ once before training, then frozen. The frozen estimate became stale as the model's representation drifted during training. $G_1$ worsened by $-56\%$ relative to control.
+
+\subsection{Gradient Shielding (1 mechanism, 3 strength variants)}
+
+\paragraph{Mechanism 13 --- Hard/soft/adaptive gradient shielding (Days 62--64).} The $K$-collinear component of the loss gradient was projected out before the optimizer step: $g' = g - \frac{g \cdot g_K}{\|g_K\|^2} g_K$. Three projection strengths were tested ($\lambda = 1.0$, $0.5$, $0.25$). All three caused topology collapse on seed~53000. The mechanism failed because the $K$-collinear gradient component carried genuine topology information on a substantial fraction of the tested seeds: removing it ablated legitimate spatial gradient alongside the leakage component.
+
+A softer variant---weighting the projection by the estimated $K$-leakage severity---achieved $+59.3\%$ on 3~favorable seeds but $-54.2\%$ on the full 10-seed suite, confirming that the problem was structural rather than a matter of calibration.
+
+\subsection{Architectural Factorization (1 mechanism)}
+
+\paragraph{Mechanism 14 --- Split residual head + nuisance siphon (Day 65).} The residual head was split into two output channels: a topology channel and a nuisance siphon intended to absorb $K$-dependent signal. When combined with a decorrelation regularizer, the configuration achieved $+29.9\%$ median $G_1$ reduction but with topology collapse on 1 of the tested seeds. Post-hoc analysis revealed that the siphon channel was architecturally inert---both channels became equally uncorrelated with~$K$. The observed improvement was attributable to the accompanying decorrelation regularizer (see Mechanism~3 above), confirming that the factorization itself added no value.
+
+% ──────────────────────────────────────────────────────────────────────
+\onecolumngrid
+\section{Checkpoint Selector Pseudo-Code and Evolution}
+\label{app:selector}
+
+\subsection{Selector v6 Pseudo-Code}
+
+\begin{lstlisting}
+FUNCTION SelectEpoch(metrics_by_epoch, params):
+    INPUT:
+        metrics_by_epoch: list of {epoch, G1_aligned, topo_TG, slice_clean, ...}
+        params:
+            tau_clean     = 0.025   # g1_roll cap for CLEAN pool
+            tau_clean_hi  = 0.035   # g1_aligned instantaneous cap
+            tg_floor      = -0.015  # minimum tg_roll for survival
+            active_min    = 6       # skip warmup epochs 1-5
+            roll_window   = 3       # trailing median window
+
+    1. FILTER active epochs: active = {e in metrics | e.epoch >= active_min}
+
+    2. COMPUTE rolling medians (trailing window = 3):
+         g1_roll[e]  = median(G1_aligned over [e-2, e-1, e])
+         tg_roll[e]  = median(topo_TG  over [e-2, e-1, e])
+         sc_roll[e]  = median(slice_clean over [e-2, e-1, e])
+
+    3. SURVIVAL filter:
+         surviving = {e in active | tg_roll[e] >= tg_floor}
+         # In production (drop_slice_floor=True), skip sc_roll check
+
+    4. POOL assignment:
+         clean_pool = {e in surviving |
+                       g1_roll[e] <= tau_clean AND
+                       e.G1_aligned <= tau_clean_hi}
+         leaky_pool = surviving \ clean_pool
+
+    5. SELECTION:
+         IF surviving is empty:
+             mode = TOPO_FAIL
+             chosen = argmax(tg_roll) over active
+             tie-break: lower g1_roll
+         ELIF clean_pool is non-empty:
+             mode = CLEAN_MAX_TG
+             chosen = argmax(tg_roll) over clean_pool
+             tie-break: higher sc_roll, then lower g1_roll
+         ELSE:
+             mode = LEAKY_MIN_G1ROLL
+             chosen = argmin(g1_roll) over surviving
+             tie-break: higher tg_roll
+
+    RETURN {chosen_epoch, mode, g1_roll, tg_roll, sc_roll,
+            n_active, n_surviving, n_clean, n_leaky}
+\end{lstlisting}
+
+\subsection{Selector Evolution}
+
+The checkpoint selector underwent six iterations driven by empirical failures at increasing code distance:
+
+\begin{table*}
+\caption{Selector version history.}
+\label{tab:selector_evolution}
+\renewcommand{\arraystretch}{1.2}
+\begin{ruledtabular}
+\begin{tabular}{llll}
+Version & Day & Key change & Failure that motivated it \\
+\hline
+v1 & 69 & Min-$G_1$ fallback, single threshold & Cherry-picks noise dips in $G_1$ trajectory \\
+v2 & 70 & Added SliceClean as secondary check & SliceClean itself too noisy at $d{=}7$ \\
+v3 & 71 & SliceClean survival filter (hard floor) & 80\% TOPO\_FAIL rate at $d{=}7$ \\
+v4 & 72 & Relaxed SliceClean floor & Same underlying instability \\
+v5 & 73a & Rolling medians for $G_1$ (window=3) & Smoothing helped $G_1$ but not SliceClean \\
+\textbf{v6} & \textbf{73b} & \textbf{\texttt{drop\_slice\_floor} + dual-cap CLEAN} & \textbf{Eliminates SliceClean survival noise} \\
+\end{tabular}
+\end{ruledtabular}
+\renewcommand{\arraystretch}{1.0}
+\end{table*}
+
+The critical insight from v3$\to$v6 was that SliceClean, while useful as a quality metric, was too noisy at $d{=}7$ to serve as a survival filter. The \texttt{drop\_slice\_floor} flag in v6 removes SliceClean from the survival gate while retaining it as a tie-breaker within the CLEAN pool selection. The dual-cap qualification for CLEAN (both $\mathrm{g1\_roll} \leq 0.025$ and $\mathrm{G1\_aligned} \leq 0.035$) prevents selection of epochs where the rolling median is acceptably low but a single-epoch $G_1$ spike violates the bound.
+
+\subsection{Dual-Cap Rationale}
+
+The CLEAN pool uses two separate $G_1$ thresholds:
+
+\begin{enumerate}
+\item \textbf{Rolling cap} ($\mathrm{g1\_roll} \leq 0.025$): ensures the trailing trend is low, preventing entry based on a single lucky epoch.
+\item \textbf{Instantaneous cap} ($\mathrm{G1\_aligned} \leq 0.035$): ensures the epoch being considered does not itself have an anomalously high $G_1$ that would be masked by the rolling median.
+\end{enumerate}
+
+Both must be satisfied for CLEAN qualification. This addresses a failure mode observed in v5 where an epoch with $G_1 = 0.08$ qualified for CLEAN because its rolling median (dragged down by two preceding low-$G_1$ epochs) was below $0.025$.
+\twocolumngrid
+
+% ──────────────────────────────────────────────────────────────────────
+\section{Cross-Platform Reproduction}
+\label{app:repro}
+
+\subsection{Reference Environments}
+
+All canonical results in this paper were produced in one of two validated environments:
+
+\begin{table*}
+\caption{Reference environments.}
+\label{tab:environments}
+\begin{ruledtabular}
+\begin{tabular}{lllll}
+Label & Platform & OS & Hardware & Used for \\
+\hline
+\textbf{DEV} & Local workstation & Windows 11 & Intel i7-14700HX, CPU-only & $d{=}5$ canonical (Day 69) \\
+\textbf{GPU} & RunPod cloud & Ubuntu 24.04 (Docker) & NVIDIA RTX PRO 6000 (96\,GB) & $d{=}7$ canonical (Day 70), holdout (Day 75) \\
+\end{tabular}
+\end{ruledtabular}
+\end{table*}
+
+\subsection{Sources of Non-Determinism}
+
+Cross-platform numerical differences arise from:
+
+\begin{enumerate}
+\item \textbf{Floating-point non-associativity.} Summation order in scatter-mean operations differs between CPU and GPU backends, and between CUDA kernel implementations. This affects message-passing aggregation and batch-level loss computation.
+\item \textbf{cuDNN non-determinism.} Even with \texttt{torch.use\_deterministic\_algorithms(True)}, some operations (e.g., atomic scatter-add on GPU) may remain non-deterministic across runs.
+\item \textbf{RNG state divergence.} When the same seed produces different batch orderings due to dataloader threading differences across platforms, the entire training trajectory diverges.
+\end{enumerate}
+
+\subsection{Observed Variance}
+
+A cross-platform reproduction of Day~75 (holdout) was conducted on GPU hardware different from the canonical GPU environment:
+
+\begin{table}[htbp]
+\caption{Canonical vs.\ reproduction comparison (Day 75 holdout).}
+\label{tab:repro}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Metric & Canonical run & Reproduction run \\
+\hline
+Science $\Delta$ & $+45.0\%$ & $+12.4\%$ \\
+Safe Yield (Prod) & 80\% (8/10) & 90\% (9/10) \\
+TOPO\_FAIL & 0/10 & 0/10 \\
+Alignment & 240/240 & 240/240 \\
+DNH violations & 0 & 0 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+The safety invariants (zero topology collapses, full alignment, zero Do-No-Harm violations) were preserved across platforms. The efficacy point estimate ($\Delta$) showed substantial variance ($+45.0\%$ vs $+12.4\%$), consistent with the wide bootstrap confidence intervals reported in Secs.~IV\,B--D and the known sensitivity of the median statistic to individual seed trajectories at $N{=}10$.
+
+\subsection{Reproduction Policy}
+
+The project's reproduction policy treats the canonical results from the validated reference environment as the authoritative point estimates. Cross-platform reproduction is used to validate:
+
+\begin{enumerate}
+\item \textbf{Aggregate directional efficacy}: ExactK should improve median $G_1$ relative to control ($\Delta > 0$) in aggregate.
+\item \textbf{Safety preservation}: zero topology collapses, full alignment passage, zero Do-No-Harm violations.
+\item \textbf{Broad qualitative consistency}: the overall pattern of improvement should be directionally consistent, though individual seed-level responses may vary across platforms.
+\end{enumerate}
+
+Exact numerical agreement of point estimates is \emph{not} expected across platforms, and quantitative reproduction targets are not imposed beyond aggregate directional sign consistency.
+
+\subsection{Reproduction Scripts}
+
+Canonical experiment configurations and reproduction scripts are provided in \texttt{scripts/reproduce/}:
+
+\begin{itemize}
+\item \texttt{repro\_day69\_d5.sh} --- $d{=}5$ primary validation
+\item \texttt{repro\_day70\_d7.sh} --- $d{=}7$ OOD transfer
+\item \texttt{repro\_day75\_holdout.sh} --- $d{=}7$ holdout validation
+\end{itemize}
+
+Each script specifies the exact seed set, hyperparameters, data generation parameters, and artifact output directory. Running these scripts on a different platform is expected to produce qualitatively consistent aggregate results with numerically different point estimates.
+
+% ──────────────────────────────────────────────────────────────────────
+\onecolumngrid
+\section{Implementation Details: Logging, Checkpointing, and Receipts}
+\label{app:impl}
+
+\subsection{JSONL Write-Ahead Logging}
+
+Each training run produces a per-seed metrics log in JSONL (JSON Lines) format, with one epoch record appended and immediately flushed after each \texttt{log\_epoch()} call. In the canonical production experiment path used for the paper's reported results, the training script additionally calls \texttt{os.fsync()} after \texttt{log\_epoch()}, yielding a write-ahead logging pattern with per-epoch durability guarantees.
+
+\begin{lstlisting}
+{"epoch": 1, "loss": 0.6932, "G1_aligned": 0.0412, "topo_TG": 0.031, ...}
+{"epoch": 2, "loss": 0.6891, "G1_aligned": 0.0387, "topo_TG": 0.033, ...}
+...
+\end{lstlisting}
+
+\paragraph{Implementation.} The \texttt{EpochLogger} class opens the log file in append mode and calls \texttt{flush()} after each \texttt{log\_epoch()} invocation. The logger is used as a context manager:
+
+\begin{lstlisting}[language=Python]
+with EpochLogger("metrics_47000.jsonl") as logger:
+    for epoch in range(1, 13):
+        metrics = train_one_epoch(...)
+        logger.log_epoch(metrics)
+\end{lstlisting}
+
+\paragraph{Core schema.} Each JSONL record contains the following primary fields:
+
+\begin{table*}
+\caption{Core JSONL schema fields.}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Field & Type & Description \\
+\hline
+\texttt{epoch} & int & 1-indexed epoch number \\
+\texttt{loss} & float & Training loss for this epoch \\
+\texttt{G1\_aligned} & float & Linear probe $R^2$ ($z \to K$), aligned tensor \\
+\texttt{topo\_TG} & float & TopologyGain ($\SliceC_{\text{clean}} - \SliceC_{\text{scrambled}}$) \\
+\texttt{slice\_clean} & float & Mean per-$K$-bin AUROC on clean predictions \\
+\texttt{mean\_drop} & float & Mean prediction drop under $K$-matched scrambling \\
+\end{tabular}
+\end{ruledtabular}
+\end{table*}
+
+\paragraph{Optional telemetry fields.} Depending on the experiment configuration, records may also include:
+
+\begin{table*}
+\caption{Optional telemetry fields.}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Field & Type & Description \\
+\hline
+\texttt{G1\_raw\_probe} & float & Raw MLP probe score (historical, pre-Day~55 formats) \\
+\texttt{alignment\_ok} & bool & Whether probe tensor matches K-ortho target tensor \\
+\texttt{iso\_active} & bool & Whether ExactK loss was active this epoch \\
+\texttt{iso\_bce\_ratio} & float & Ratio of ExactK loss to focal loss \\
+\texttt{mean\_pairs\_used} & float & Mean number of iso-$K$ pairs mined per batch \\
+\texttt{mean\_violation\_rate} & float & Fraction of pairs violating the hinge margin \\
+\texttt{mean\_zgap} & float & Mean $z_{\text{pos}} - z_{\text{neg}}$ across mined pairs \\
+\texttt{lambda\_epoch} & float & Effective $\lambda$ for this epoch \\
+\texttt{nan\_detected} & bool & Whether NaN/Inf was detected in any tensor \\
+\end{tabular}
+\end{ruledtabular}
+\end{table*}
+
+\subsection{Progressive Checkpointing}
+
+Model checkpoints are saved after every epoch as \texttt{ckpt\_\{seed\}\_ep\{epoch\}.pt}, containing the full \texttt{state\_dict}. After selector v6 determines the best epoch for each seed, the pipeline:
+
+\begin{enumerate}
+\item Copies the selected checkpoint to \texttt{best\_model\_\{seed\}.pt}.
+\item Deletes unselected checkpoints to reclaim disk space.
+\end{enumerate}
+
+This progressive strategy avoids the need to choose a checkpoint epoch \emph{during} training while keeping disk usage bounded. The cleanup step is deferred until selector execution is complete, ensuring that the selection decision is never constrained by checkpoint availability.
+
+\subsection{Selection Receipt Schema}
+
+After checkpoint selection, a per-seed JSON receipt is written to \texttt{selection\_receipt\_\{seed\}.json}. The following tables define the paper-facing normalized receipt contract; the raw repository schema may include additional internal fields, but any valid receipt must contain all required fields as populated by the selector's \texttt{\_build\_result} function.
+
+\paragraph{Required fields} (always present in every receipt):
+
+\begin{table*}
+\caption{Required receipt fields.}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Field & Type & Description \\
+\hline
+\texttt{epoch} & int & Selected epoch \\
+\texttt{G1\_aligned} & float & Instantaneous linear probe $R^2$ at selected epoch \\
+\texttt{g1\_roll} & float & Trailing-median $G_1$ (window=3) \\
+\texttt{g1\_spike\_delta} & float & $\mathrm{G1\_aligned} - \mathrm{g1\_roll}$; positive = spike above trend \\
+\texttt{slice\_clean} & float & Per-$K$-bin AUROC at selected epoch \\
+\texttt{slice\_clean\_roll} & float & Trailing-median SliceClean \\
+\texttt{tg\_roll} & float & Trailing-median TopologyGain \\
+\texttt{mean\_drop} & float & Mean prediction drop under scrambling \\
+\texttt{selection\_mode} & str & \texttt{CLEAN\_MAX\_TG}, \texttt{LEAKY\_MIN\_G1ROLL}, or \texttt{TOPO\_FAIL\_MAX\_TG} \\
+\texttt{n\_active} & int & Epochs passing warmup filter \\
+\texttt{n\_surviving} & int & Epochs passing topology-floor survival \\
+\texttt{n\_clean} & int & Epochs qualifying for CLEAN pool \\
+\texttt{n\_leaky} & int & Epochs in LEAKY pool \\
+\texttt{slice\_floor\_used} & float & SliceClean floor threshold applied \\
+\end{tabular}
+\end{ruledtabular}
+\end{table*}
+
+\paragraph{Optional fields} (present when available; may be null):
+
+\begin{table*}
+\caption{Optional receipt fields.}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Field & Type & Description \\
+\hline
+\texttt{topo\_TG} & float & Instantaneous TopologyGain (may be absent in minimal configs) \\
+\texttt{loss} & float & Training loss at selected epoch \\
+\end{tabular}
+\end{ruledtabular}
+\end{table*}
+
+\paragraph{Illustrative example:}
+
+\begin{lstlisting}
+{
+  "epoch": 9,
+  "G1_aligned": 0.0098,
+  "g1_roll": 0.0112,
+  "g1_spike_delta": -0.0014,
+  "slice_clean": 0.5312,
+  "slice_clean_roll": 0.5234,
+  "topo_TG": 0.0502,
+  "tg_roll": 0.0487,
+  "mean_drop": 0.0041,
+  "loss": 0.6821,
+  "selection_mode": "CLEAN_MAX_TG",
+  "n_active": 7,
+  "n_surviving": 7,
+  "n_clean": 5,
+  "n_leaky": 2,
+  "slice_floor_used": 0.500
+}
+\end{lstlisting}
+
+The \texttt{g1\_spike\_delta} field provides a single-number diagnostic for whether the chosen epoch's instantaneous leakage deviates from its trend. The pool counts (\texttt{n\_active}, \texttt{n\_surviving}, \texttt{n\_clean}, \texttt{n\_leaky}) enable post-hoc analysis of selector behavior without re-running the selection algorithm.
+
+\paragraph{Traceability.} The combination of JSONL metrics logs, progressive checkpoints, and selection receipts establishes a full provenance chain: from per-epoch raw metrics, through the selector's pool assignment and objective optimization, to the final deployed checkpoint. Any reported result can be traced back to the specific epoch, metrics values, and selection reasoning that produced it.
+\twocolumngrid
+
+% end of appendices

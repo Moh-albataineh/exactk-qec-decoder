@@ -1,39 +1,55 @@
-# ExactK: Iso-K Hinge Loss for QEC Decoding
+# ExactK: Iso-$K$ Hinge Loss for Robust K-Leakage Reduction in QEC Neural Decoders
 
-A production-ready ML decoder for **Quantum Error Correction** on surface codes, using iso-K hinge loss to eliminate K-leakage confounding in factor-graph neural network decoders.
+An auxiliary training loss for quantum error correction neural decoders that eliminates syndrome-count confounding by constraining ranking comparisons to sample pairs with identical syndrome count ($\Delta K = 0$).
 
 ---
 
-## V1.0 Headline Results
+## AI-Assisted Development Disclosure
 
-| KPI | Value | Target |
-|-----|-------|--------|
-| Science Δ (epoch-median G1) | **+45.0%** | ≥ 20% |
-| Safe Yield (Prod) | **80%** (8/10) | ≥ 80% |
-| TOPO_FAIL | **0/10** | ≤ 10% |
-| KPI-B: Leaky cohort improvement | **+15.1%** (83% wins) | > 0 |
-| Do-No-Harm violations | **0** | 0 |
+This repository was developed through a heavily AI-assisted workflow directed by the author. Large language model tools were used extensively for planning support, code generation and revision, debugging, documentation drafting, manuscript editing, and LaTeX/PDF preparation. The author's role was to direct the workflow, review outputs, validate final results used in the release, integrate the final artifacts, and assume responsibility for the released claims.
 
-Validated on unseen holdout seeds (60000–60009) at d=7, p=0.04.
+See [`docs/AI_DISCLOSURE.md`](docs/AI_DISCLOSURE.md) for details.
+
+---
+
+## Status
+
+This repository is a **research artifact and paper companion** for the ExactK manuscript. It contains:
+
+- The complete source code for the bipartite factor-graph decoder and ExactK loss
+- Reproduction scripts for all key experiments (d=5, d=7, holdout)
+- The final manuscript LaTeX source and figures
+- 75 days of development documentation and provenance
+
+---
+
+## Main Results (V1.0 Holdout — Day 75)
+
+| KPI | Value | Target | Status |
+|-----|-------|--------|--------|
+| Science Δ (epoch-median G₁) | **+45.0%** | ≥ 20% | Pass |
+| Safe Yield (Prod CLEAN) | **80%** (8/10) | ≥ 80% | Pass |
+| TOPO_FAIL | **0/10** | ≤ 10% | Pass |
+| KPI-B: Leaky cohort improvement | **+15.1%** (83% wins) | > 0 | Pass |
+| Do-No-Harm violations | **0** | 0 | Pass |
+
+Validated on 10 unseen holdout seeds (60000–60009) at d=7, p=0.04, correlated crosstalk noise.
+
+**Prior to ExactK**, 14 mitigation mechanisms across 5 families (global decorrelation, null-space alignment, K-orthogonalization, gradient shielding, architectural factorization) were tested over 28 development days. None reliably reduced K-leakage while preserving topology signal across seeds at the required effect size.
 
 ---
 
 ## What is ExactK?
 
-ExactK is an **iso-K hinge loss** that ranks model predictions within groups of samples that share the same syndrome count K. By matching samples with identical K values, ExactK eliminates all K-confounding within training pairs — the model can only improve by learning genuine topology, not syndrome-count shortcuts.
+Syndrome count $K$ (the number of triggered detectors) is a strong statistical predictor of logical error probability in surface codes. Neural decoders can exploit this as a shortcut, encoding density information into representations intended for spatial topology — a phenomenon we call **K-leakage**.
 
-### Key Innovation
+ExactK addresses this by adding an auxiliary hinge-margin ranking loss that mines training pairs exclusively from samples sharing identical $K$. Because within-pair $K$ variation is zero by construction, the model can only improve on this loss by learning genuine spatial structure, not syndrome-count shortcuts.
 
-14 K-leakage mitigation mechanisms were tested across 28 days (Days 42–69). Only ExactK succeeded:
-
-| Family | Result |
-|--------|--------|
-| Global regularization (GRL, Corr², penalty) | ❌ Cannot distinguish physics from shortcut |
-| Null-space alignment | 🟡 Seed-dependent |
-| K-orthogonalization (5 variants) | ❌ Bootstrap problem |
-| Gradient shielding (3 variants) | ❌ K-gradient carries topology signal |
-| Architectural factorization | ❌ Siphon didn't siphon |
-| **ExactK iso-K hinge loss** | **✅ +31.2% (d=5), +23.4% (d=7)** |
+Key properties:
+- **No gradient surgery** — operates entirely in the forward pass
+- **No architectural modification** — a pair-mining step within each batch
+- **No adversarial training** — no min-max optimization
+- **Strict $\Delta K = 0$ constraint** — relaxing to $\Delta K = 1$ reintroduces confounding
 
 ---
 
@@ -44,11 +60,9 @@ ExactK is an **iso-K hinge loss** that ranks model predictions within groups of 
 ```bash
 git clone https://github.com/Moh-albataineh/exactk-qec-decoder.git
 cd exactk-qec-decoder
-
 python -m venv .venv
 source .venv/bin/activate    # Linux/macOS
 # .venv\Scripts\activate     # Windows
-
 pip install -r requirements.txt
 ```
 
@@ -56,12 +70,6 @@ pip install -r requirements.txt
 
 ```bash
 python -m pytest tests/ -v
-```
-
-### Smoke Test
-
-```bash
-bash scripts/reproduce/smoke_test.sh
 ```
 
 ### Reproduce Key Results
@@ -73,64 +81,39 @@ bash scripts/reproduce/smoke_test.sh
 | Holdout (10 seeds) | `bash scripts/reproduce/repro_day75_holdout.sh` | ~4 hours |
 | Selector + KPIs | `bash scripts/reproduce/run_selector_v6.sh` | ~1 min |
 
-> **Canonical Results vs Reproduction Runs**: The metrics in this README and in `docs/RESULTS.md` are **canonical results** from the validated reference environment used during the project. Re-running on different hardware (GPU architecture, CUDA version, or CPU vs GPU) may yield numerically different results due to floating-point non-determinism. A reproduction is successful if it preserves the same **verdict**, **safety invariants** (0 topology collapses, alignment pass, no NaN/Inf), and a **qualitatively similar effect size** — not exact decimal equality. See [`docs/REPRO_POLICY.md`](docs/REPRO_POLICY.md) for details.
+> **Note**: Canonical results are from the validated reference environment. Re-running on different hardware may yield numerically different results due to floating-point non-determinism. A reproduction is successful if it preserves the same verdict, safety invariants, and qualitatively similar effect size. See [`docs/REPRO_POLICY.md`](docs/REPRO_POLICY.md).
 
 ---
 
-## Project Structure
+## Paper
 
-```
-exactk-qec-decoder/
-├── qec_noise_factory/           # Core Python package
-│   ├── ml/                      # ML decoder pipeline
-│   │   ├── models/              # Factor-graph, GNN, MLP decoders
-│   │   ├── ops/                 # Checkpoint selection (selector v6)
-│   │   ├── diagnostics/         # G1 probe, K-leakage diagnostics
-│   │   ├── graph/               # DEM bipartite graph builder
-│   │   ├── train/               # Training loop
-│   │   ├── eval/                # Evaluation utilities
-│   │   └── bench/               # Benchmarking tools
-│   ├── physics/                 # Noise models (SD6, SI1000, correlated)
-│   ├── factory/                 # Stim circuit builders
-│   ├── verify/                  # Quality gates
-│   └── utils/                   # Hashing utilities
-│
-├── tests/                       # Test suite (21 files, 200+ tests)
-├── scripts/                     # Analytics + reproduction
-│   ├── reproduce/               # Shell scripts for key experiments
-│   └── *.py                     # Selector, KPI computation
-│
-├── docs/                        # Full documentation
-│   ├── DAYS.md                  # Daily development log (75 days)
-│   ├── RESULTS.md               # Benchmark + V1.0 KPI results
-│   ├── METHODS.md               # Technical methods
-│   ├── LIMITATIONS.md           # Known constraints
-│   └── MLOPS_POLICY.md          # Production deployment policy
-│
-├── paper/                       # Paper companion artifacts
-│   └── claims_traceability.md   # Claim → evidence mapping
-│
-├── CITATION.cff                 # Academic citation metadata
-├── CHANGELOG.md                 # Version history
-├── REPRODUCIBILITY.md           # Seeds, hardware, instructions
-├── TESTING.md                   # Test commands and categories
-└── requirements.txt             # Python dependencies
-```
+**Final PDF**: [`paper/ExactK_Final.pdf`](paper/ExactK_Final.pdf)
+
+The manuscript LaTeX source is in [`paper/overleaf_package/`](paper/overleaf_package/):
+
+| File | Description |
+|------|-------------|
+| `paper/overleaf_package/main.tex` | Document root |
+| `paper/overleaf_package/sections/` | All section `.tex` files |
+| `paper/overleaf_package/figures/` | Final figure PDFs |
+| `paper/overleaf_package/references.bib` | Bibliography |
+| `paper/plot_figures.py` | Figure generation script |
+| `paper/compute_bootstrap_cis.py` | Bootstrap CI computation |
+| `paper/claims_traceability.md` | Claim → evidence mapping |
 
 ---
 
-## Artifact Policy
+## Repository Layout
 
-This repository contains **code and documentation only**. The following are excluded (by `.gitignore`):
+See [`docs/REPO_LAYOUT.md`](docs/REPO_LAYOUT.md) for the full annotated tree. Key directories:
 
-| Excluded | Reason |
-|----------|--------|
-| `ml_artifacts/` | Generated at runtime by reproduction scripts |
-| `*.pt`, `*.pth` | Model checkpoints (generated, not versioned) |
-| `*.jsonl` | Training logs (generated per run) |
-| `shards/`, `packs/` | Large binary data (regenerated by Stim) |
-
-All artifacts can be regenerated by the scripts in `scripts/reproduce/`.
+| Directory | Purpose |
+|-----------|---------|
+| `qec_noise_factory/` | Core Python package (decoder, training, evaluation) |
+| `tests/` | 18 test files, 200+ tests |
+| `scripts/reproduce/` | Shell scripts for reproducing key experiments |
+| `paper/overleaf_package/` | Final canonical LaTeX source |
+| `docs/` | Methods, results, limitations, AI disclosure, provenance |
 
 ---
 
@@ -142,9 +125,9 @@ All artifacts can be regenerated by the scripts in `scripts/reproduce/`.
 | [`docs/RESULTS.md`](docs/RESULTS.md) | Benchmark results + V1.0 release KPIs |
 | [`docs/METHODS.md`](docs/METHODS.md) | Technical methods: ExactK, selector v6, MLOps |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Known constraints and caveats |
-| [`docs/MLOPS_POLICY.md`](docs/MLOPS_POLICY.md) | Production deployment policy |
-| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Seeds, hardware, reproduction guide |
+| [`docs/AI_DISCLOSURE.md`](docs/AI_DISCLOSURE.md) | AI-assisted development disclosure |
 | [`docs/REPRO_POLICY.md`](docs/REPRO_POLICY.md) | Canonical vs reproduction run policy |
+| [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) | Seeds, hardware, reproduction guide |
 
 ---
 

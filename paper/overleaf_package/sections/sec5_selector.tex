@@ -1,0 +1,44 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 5: Checkpoint Selection
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Checkpoint Selection and the Asymmetric Selection Paradox}
+\label{sec:selector}
+
+\subsection{The Problem}
+
+Epoch-median $G_1$ measures treatment efficacy in aggregate but is not a deployment-time object: deploying a decoder requires selecting a \emph{single checkpoint} per trained model. Naive strategies such as selecting the epoch with minimum $G_1$ cherry-pick noise dips---epochs where $G_1$ happens to be near zero---causing both arms to converge to indistinguishable values and destroying the measured treatment effect. This is a general hazard for any per-epoch selection criterion applied to noisy training trajectories.
+
+\subsection{The Asymmetric Selection Paradox}
+
+The holdout experiment (Day~75) revealed a subtle metric failure. Our checkpoint selector (v6) assigns each seed-epoch to one of two pools based on leakage level:
+
+\begin{itemize}
+\item \textbf{CLEAN pool} (epochs satisfying dual-cap thresholds on rolling $G_1$): selection objective is $\arg\max(\mathrm{tg\_roll})$---maximize topology quality.
+\item \textbf{LEAKY pool} (surviving epochs not in CLEAN): selection objective is $\arg\min(\mathrm{g1\_roll})$---minimize leakage.
+\end{itemize}
+
+Because these pools optimize different objectives, comparing the \emph{selected} $G_1$ between arms is invalid when the arms are routed to different pools. In the holdout, control often selected LEAKY-pool epochs with near-zero $\mathrm{g1\_roll}$, while ExactK selected CLEAN-pool epochs optimized for topology rather than minimum~$G_1$. The resulting ``deployment $\Delta$'' of $-324.8\%$ was a metric artifact, not a physics failure.
+
+We term this the \emph{Asymmetric Selection Paradox}: any multi-objective selector with heterogeneous pool criteria produces incomparable inter-arm metrics unless the comparison is restricted to the shared objective. Our resolution is to permanently deprecate selected-$G_1$ comparisons and to evaluate treatment efficacy via epoch-median~$G_1$ (which aggregates over all active epochs regardless of selector routing). Deployment readiness is instead assessed through Safe Yield (fraction of seeds in the CLEAN pool), TOPO\_FAIL rate, and Do-No-Harm constraints.
+
+\subsection{Selector v6}
+
+The production selector uses a single survival filter ($\mathrm{tg\_roll} \geq -0.015$) and the following pool structure:
+
+\begin{table*}
+\caption{Selector v6 pool structure.}
+\renewcommand{\arraystretch}{1.25}
+\begin{ruledtabular}
+\begin{tabular}{lll}
+Pool & Entry criteria & Selection objective \\
+\hline
+CLEAN & $\mathrm{g1\_roll} \leq 0.025$ and $\mathrm{g1\_aligned} \leq 0.035$ & $\arg\max(\mathrm{tg\_roll})$; tie-break: lower $\mathrm{g1\_roll}$ \\[2pt]
+LEAKY & Surviving, not CLEAN & $\arg\min(\mathrm{g1\_roll})$; tie-break: higher $\mathrm{tg\_roll}$ \\[2pt]
+TOPO\_FAIL & No surviving epochs & $\arg\max(\mathrm{tg\_roll})$; tie-break: lower $\mathrm{g1\_roll}$ \\
+\end{tabular}
+\end{ruledtabular}
+\renewcommand{\arraystretch}{1.0}
+\end{table*}
+
+Rolling metrics ($\mathrm{g1\_roll}$, $\mathrm{tg\_roll}$) use a trailing median window of 3~epochs. The dual-cap qualification for CLEAN requires both rolling $G_1$ and the aligned instantaneous check $\mathrm{G1\_aligned}$ to remain below threshold, preventing selection of epochs where the rolling median is low but a single-epoch spike violates the bound. Full pseudo-code and the selector evolution from v1 through v6 are provided in Appendix~\ref{app:selector}. Implementation details (JSONL write-ahead logging, progressive checkpointing, receipt schema) are in Appendix~\ref{app:impl}.

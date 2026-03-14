@@ -1,0 +1,13 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 8: Conclusion
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Conclusion}
+
+We introduced ExactK, an iso-$K$ hinge loss that removes within-pair $K$ variation from the auxiliary ranking objective in QEC neural decoder training. The mechanism is minimal---a pair-mining step within each batch---and operates entirely in the forward pass, requiring no gradient surgery, no architectural modification, and no adversarial training.
+
+The design of ExactK was motivated by a systematic evaluation of 14~prior mechanisms across five families, all of which failed to reliably reduce K-leakage while preserving topology signal across seeds at the required effect size. The common failure mode was that syndrome count~$K$ carries physically meaningful information in QEC, so interventions targeting global $z$--$K$ dependence inevitably destroy legitimate covariance alongside shortcuts. ExactK sidesteps this by constraining only within-$K$ comparisons in the auxiliary loss.
+
+In the tested regime---surface codes at $d{=}5$ and $d{=}7$ with correlated crosstalk noise at $p{=}0.04$---ExactK reduced linear K-leakage ($G_1$) by $31.2\%$ at $d{=}5$, $23.4\%$ at $d{=}7$ using the same hyperparameters, and $45.0\%$ on unseen holdout seeds, with zero topology collapses across the 30-seed Day~69/70/75 validation suite and 960/960 alignment checks passing. A minority of seeds showed increased leakage---an adversarial subset whose behavior is distance-dependent and, at present, unpredictable.
+
+These results indicate that K-leakage in neural QEC decoders can be substantially reduced through targeted within-$K$ ranking pressure, and that the strict $\Delta K{=}0$ constraint is essential---relaxing to $\Delta K{=}1$ reintroduces the confounding it is designed to remove. The mechanism's simplicity makes it a practical candidate for integration into QEC decoder training pipelines, subject to validation across a broader range of physical regimes.

@@ -1,0 +1,75 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 2: Background and Problem Formulation
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Background and Problem Formulation}
+\label{sec:background}
+
+\subsection{Surface Codes and Decoding}
+
+We consider the standard memory experiment on the rotated surface code~\cite{PLACEHOLDER_surface_code} at code distances $d \in \{5, 7\}$, with $r = d$ rounds of syndrome extraction. A distance-$d$ rotated surface code has $n_d = d^2$ data qubits, $d^2 - 1$ stabilizer measurements per round, and yields $n_{\mathrm{det}}$ detector events ($n_{\mathrm{det}} = 120$ at $d{=}5$, $n_{\mathrm{det}} = 336$ at $d{=}7$) and a single logical observable flip $Y \in \{0, 1\}$.
+
+Circuits are generated using Stim~\cite{PLACEHOLDER_stim}, which produces a detector error model (DEM)---a list of independent error mechanisms, each annotating which detectors it triggers with what probability and whether it flips the logical observable. The DEM is the sufficient statistic for maximum-likelihood decoding and is used directly by MWPM~\cite{PLACEHOLDER_pymatching} via construction of a matching graph.
+
+\paragraph{Notation.} Throughout, $d$~denotes code distance, $p$~the physical error rate, $K = \sum_{i=1}^{n_{\mathrm{det}}} x_i$~the syndrome count (total triggered detectors), $Y \in \{0,1\}$~the logical error label, and $\mathbf{x} \in \{0,1\}^{n_{\mathrm{det}}}$~the raw syndrome vector.
+
+\subsection{Noise Model}
+
+All experiments use the \emph{correlated crosstalk} noise model, which combines SD6-like independent depolarizing noise with correlated two-qubit errors:
+\begin{equation}
+p_{\text{ind}} = (1 - c) \cdot p, \qquad p_{\text{corr}} = c \cdot p,
+\end{equation}
+where $c = 0.5$ is the correlation strength. Independent noise follows the SD6 channel structure ($p_{1q} = 0.1\,p_{\text{ind}}$, $p_{2q} = p_{\text{ind}}$, $p_{\text{meas}} = p_{\text{ind}}$), while correlated noise is injected as $\texttt{CORRELATED\_ERROR}(p_{\text{corr}})\; X_{q_0} X_{q_1}$ after each two-qubit gate. The correlated component creates $k{>}2$ hyperedges in the DEM that MWPM must approximate via clique expansion~\cite{PLACEHOLDER_correlated_decoding}. All experiments use $p = 0.04$ and basis~$X$.
+
+\subsection{Factor-Graph Neural Decoder}
+
+We use a bipartite factor-graph decoder that represents the DEM directly as a bipartite graph with two node types:
+\begin{itemize}
+\item \textbf{Detector nodes}~$V_D$: one per detector event (including a virtual boundary node), with input feature $x_i \in \{0,1\}$ (syndrome bit).
+\item \textbf{Error nodes}~$V_E$: one per merged error mechanism, with input feature $w_e$ (DEM matching weight $w = \ln((1-p_e)/p_e)$).
+\end{itemize}
+
+Each DEM error term becomes an error node connected to all detectors in its support set. Mechanisms with identical detector support and observable mask are merged via $p_{\text{merge}} = 1 - \prod_i (1 - p_i)$. This representation preserves $k{>}2$ hyperedge structure exactly, avoiding the information loss of clique expansion used by standard graph-based decoders.
+
+\paragraph{Message passing.} The decoder applies $L{=}3$ bipartite message-passing layers. Each layer performs two aggregation steps:
+\begin{widetext}
+\begin{align}
+\mathbf{h}_{E}^{(\ell+1)} &= \mathrm{LN}\!\left(\mathbf{h}_{E}^{(\ell)} + \mathrm{drop}\!\left(\mathrm{ReLU}\!\left(W_e \mathbf{h}_{E}^{(\ell)} + \mathrm{AGG}_{D \to E}\!\left(\sigma(\mathbf{w}_e) \odot \left(W_{D \to E}\,\mathbf{h}_{D}^{(\ell)}\right)\right) + \mathbf{b}_e\right)\right)\right), \\
+\mathbf{h}_{D}^{(\ell+1)} &= \mathrm{LN}\!\left(\mathbf{h}_{D}^{(\ell)} + \mathrm{drop}\!\left(\mathrm{ReLU}\!\left(W_d \mathbf{h}_{D}^{(\ell)} + W_{E \to D}\,\mathrm{AGG}_{E \to D}\!\left(\mathbf{h}_{E}^{(\ell+1)}\right) + \mathbf{b}_d\right)\right)\right),
+\end{align}
+\end{widetext}
+where $\mathrm{AGG}_{D \to E}$ is a weighted scatter-mean (D$\to$E messages scaled by $\sigma(w_e)$, the sigmoid of the DEM matching weight of the destination error node) and $\mathrm{AGG}_{E \to D}$ is an unweighted scatter-mean. The hidden dimension is $H{=}48$ and dropout is~$0.1$.
+
+\paragraph{Readout.} Error nodes with $\texttt{observable\_mask} = \mathrm{True}$ (those whose error mechanism flips the logical observable) are selected for pooling. The readout is $\mathrm{concat}(\mathrm{mean}(\mathbf{h}_{E}^{\mathrm{obs}}), \mathrm{max}(\mathbf{h}_{E}^{\mathrm{obs}}))$, passed through a two-layer MLP with ReLU and dropout to produce a scalar logit.
+
+\paragraph{Anti-leakage design.} The observable mask is used \emph{only} for readout pooling and is \emph{never} included as a message-passing feature. This prevents the model from learning a trivial shortcut through the mask.
+
+\subsection{Density-Residual Decomposition}
+
+The decoder's scalar logit is decomposed as
+\begin{equation}
+\hat{y} = f_{\text{prior}}(K) + \alpha \cdot z,
+\end{equation}
+where $f_{\text{prior}}(K)$ is a frozen per-bin lookup table estimating $\log(P(Y{=}1 \mid K) / P(Y{=}0 \mid K))$ from training data, $z$~is the \emph{residual logit} after K-Conditional Standardization (KCS), and $\alpha$~is a learned interpolation weight (a global scalar in the default configuration; optionally $K$-bin-conditioned via a learned lookup table). KCS normalizes the raw residual within each $K$-bin:
+\begin{equation}
+z_i = \frac{r_i - \mu_{K}[\mathrm{bin}(K_i)]}{\max\!\left(\sigma_{K}[\mathrm{bin}(K_i)],\; \sigma_{\text{floor}}\right)},
+\end{equation}
+where $\mu_K$ and $\sigma_K$ are per-bin batch statistics and $\sigma_{\text{floor}} = 0.1$. The residual~$z$ is the \emph{topology channel}: it is intended to encode spatial error structure that the density prior cannot capture. K-leakage occurs when $z$ still carries $K$-information despite the KCS normalization.
+
+\subsection{Measuring $K$-Leakage: The $G_1$ Probe}
+
+We measure linear K-leakage using a probe score $G_1$ defined as the five-fold cross-validated $R^2$ of a Ridge regression from $z$ to $K$, evaluated on an independent probe set of $N{=}4096$ samples generated with a deterministic seed:
+\begin{equation}
+G_1 = R^2_{\mathrm{cv}}\!\left(\mathrm{Ridge}(z \to K)\right).
+\end{equation}
+The probe input is the exact tensor~$z$ (the normalized residual logit after density-prior removal and KCS) that the model uses for prediction; in code this probe tensor is exposed as \texttt{logit\_residual\_norm}. $G_1 = 0$ indicates no linear $K$-information in~$z$. In the selector-era analyses, values below $0.015$ define the \emph{organic clean} regime, while the earlier Day~55 stabilization used a stricter historical pass threshold of $0.01$. The primary evaluation metric is the \emph{epoch-median~$G_1$}: for each seed, we take the median $G_1$ across all active-phase epochs ($\geq 6$), then report the median across seeds.
+
+$G_1$ captures linear leakage only and should be understood as a conservative lower bound on total K-leakage (see Section~\ref{sec:kleakage}).
+
+\subsection{TopologyGain}
+
+TopologyGain (TG) measures whether the model exploits spatial structure beyond what syndrome count alone provides:
+\begin{equation}
+\TG = \overline{\SliceC}_{\text{clean}} - \overline{\SliceC}_{\text{scrambled}},
+\end{equation}
+where $\overline{\SliceC}$ is the mean within-$K$-slice C-statistic (concordance index, equivalent to AUROC computed separately within each syndrome-count bin) and \emph{scrambling} denotes $K$-matched permutation of detector-bit positions, which destroys spatial structure while preserving~$K$. A topology \emph{collapse} is detected when the difference in mean drop between the control arm and the treatment arm exceeds $0.10$. Note that \emph{topology collapse} is a scientific diagnostic concept; the selector pool label \texttt{TOPO\_FAIL} (Section~\ref{sec:selector}) is a distinct operational category denoting that no epoch survived the topology-floor filter, and does not necessarily indicate topology collapse in the diagnostic sense.

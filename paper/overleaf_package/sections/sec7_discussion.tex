@@ -1,0 +1,46 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 7: Discussion
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Discussion}
+
+\subsection{Why ExactK Succeeded Where Others Failed}
+
+The 14~failed mechanisms (Table~\ref{tab:families}) share a common thread: each operates on the \emph{global} relationship between $z$ and $K$, either by penalizing it (decorrelation, adversarial training), by subtracting it (orthogonalization), by blocking its gradient (shielding), or by routing it to a separate channel (factorization). All of these require distinguishing between legitimate and shortcut $K$-dependence in~$z$---a distinction that cannot be made from the signal alone, because the same covariance structure encodes both.
+
+ExactK avoids this problem entirely by never operating on the global $z$--$K$ relationship. Instead, it constrains only a narrow auxiliary channel---pairwise ranking within iso-$K$ groups---where $K$ is constant and therefore cannot contribute to the ranking signal by construction. The main loss remains free to learn whatever $K$-dependent features are useful for accuracy; ExactK provides a countervailing pressure that encourages the topology channel to carry spatial information rather than density shortcuts.
+
+The specific failure modes of each family are instructive:
+\begin{itemize}
+\item \textbf{Global regularization} cannot distinguish physics from shortcut: $\Corr(z, K)^2$ penalizes both. With hysteresis gating, the penalty is safe but too weak ($+13.6\%$).
+\item \textbf{K-orthogonalization} suffers from the bootstrap problem: $\beta$ must be estimated from the same data it corrects. Per-batch estimates are too noisy at $B{=}64$--$128$; cross-epoch estimates become stale as the model updates.
+\item \textbf{Gradient shielding} removes the $K$-collinear gradient component, which on a substantial subset of tested seeds also carries genuine topology signal. Reducing the projection strength ($\lambda{=}1.0 \to 0.25$) does not resolve the issue.
+\item \textbf{Nuisance siphon} was architecturally inert: both output channels became equally uncorrelated with~$K$. The observed improvement was attributable to the decorrelation regularizer, confirming that the factorization added no value.
+\end{itemize}
+
+\subsection{The Adversarial Seed Phenomenon}
+\label{sec:adversarial}
+
+A minority of seeds showed increased $G_1$ under ExactK, with the exact fraction varying across experiments. Notably, adversarial behavior is distance-dependent: seed~49200 was strongly adversarial at $d{=}5$ ($-155.6\%$) but beneficial at $d{=}7$ ($+60.8\%$). Seeds~51000 and 55000 showed the reverse pattern.
+
+One plausible interpretation is that in the lower-dimensional $d{=}5$ setting (120~detectors), the strict iso-$K$ constraint may conflict more directly with seed-specific topology structure, leaving fewer representational degrees of freedom to satisfy both the main loss and the auxiliary ranking. In the larger $d{=}7$ setting (336~detectors), the higher-dimensional representation may offer more flexibility for accommodating the iso-$K$ ranking constraint without topology damage. We emphasize that this is a hypothesis consistent with the observed reversal, not an established mechanism.
+
+Two reactive guards were tested: StopOnRise (freeze $\lambda{=}0$ upon detecting a $G_1$ spike) and RatioCapped (cap the iso-$K$/focal loss ratio at $20\%$). Neither improved the adversarial seed without damaging winning seeds. The production policy accepts the adversarial minority as the cost of the median improvement.
+
+\subsection{Limitations}
+
+\paragraph{Tested regime.} All experiments used a single noise model (correlated crosstalk, $c{=}0.5$), a single physical error rate ($p{=}0.04$), a single basis ($X$), and two code distances ($d{=}5$, $d{=}7$). Generalization to other noise models (e.g., SI1000-like, biased-$Z$, real hardware noise), other error rates, other bases, and larger code distances ($d \geq 9$) has not been validated.
+
+\paragraph{Statistical power.} The main validation suites use 10~seeds each, while the Day~67 $\Delta K$ ablation uses 4~hard seeds. Paired bootstrap 95\% CIs for the median improvement are consequently wide and span zero even when the point estimates are large ($d{=}5$: $31.2\%$, paired bootstrap 95\% CI $[-46.3\%, 61.2\%]$; $d{=}7$: $23.4\%$, paired bootstrap 95\% CI $[-51.4\%, 51.4\%]$; holdout: $45.0\%$, paired bootstrap 95\% CI $[-31.9\%, 60.7\%]$). This reflects genuine seed heterogeneity and the presence of adversarial seeds, and it limits how strongly any single-regime quantitative estimate should be generalized.
+
+\paragraph{Linear leakage only.} $G_1$ measures linear $K$-leakage. Nonlinear leakage was detected by early diagnostics but is neither targeted by ExactK nor measured by~$G_1$. The reported improvements therefore reflect reduction of the dominant linear leakage mode.
+
+\paragraph{No MWPM comparison at final configuration.} The paper does not claim that the ExactK-trained factor-graph decoder outperforms MWPM\@. The MWPM benchmarks conducted earlier in the project used a different model (GNN v1), and no comparison was performed at the final factor-graph + ExactK configuration.
+
+\paragraph{Hyperparameter transfer.} The margin ($m{=}0.30$), loss weight ($\lambda{=}0.10$), and decay schedule ($0.85^{(\text{ep}-8)}$) were hand-tuned for $d{=}5$, $p{=}0.04$. These transferred to $d{=}7$ without modification, but transfer to substantially different regimes ($d{=}9$, $p{=}0.01$) is untested.
+
+\paragraph{Hardware reproducibility.} The $d{=}5$ canonical results were produced on CPU in the local development environment, whereas the $d{=}7$/holdout canonical results were produced on GPU in the validated RunPod environment. Cross-platform reproduction is expected to preserve qualitative conclusions and safety invariants while allowing numerically different point estimates.
+
+\subsection{Future Work}
+
+Several directions follow from this work: (i)~cross-$p$ validation to test whether the production hyperparameters transfer across physical error rates; (ii)~evaluation at larger code distances ($d{=}9$, $d{=}11$) with adapted pair budgets; (iii)~validation on diverse noise models including SI1000-like and empirical hardware noise profiles; (iv)~development of pre-training diagnostics (e.g., DEM graph features) to predict seed-level compatibility with ExactK; (v)~adaptive $\lambda$ scheduling based on online $G_1$ monitoring; (vi)~formal analysis of the relationship between $\Delta K{=}0$ pair mining and gradient-level $K$-independence under the auxiliary loss.

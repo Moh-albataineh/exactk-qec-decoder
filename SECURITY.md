@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability, please report it responsibly:
 
-- **Email**: [your-email@example.com]
+- **Email**: [albatainehm1@my.smccd.edu]
 - **Do not** open a public GitHub issue for security vulnerabilities
 
 We will acknowledge receipt within 48 hours and provide a timeline for a fix.

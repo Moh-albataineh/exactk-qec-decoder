@@ -1,0 +1,19 @@
+% ══════════════════════════════════════════════════════════════════════
+% Front Matter (REVTeX 4.2 format)
+% ══════════════════════════════════════════════════════════════════════
+
+\title{ExactK: Iso-$K$ Hinge Loss for Robust $K$-Leakage Reduction\\in QEC Neural Decoders}
+
+\author{Mohammad Albataineh}
+\affiliation{Independent Researcher}
+\email{albatainehm1@my.smccd.edu}
+
+\date{\today}
+
+\begin{abstract}
+Neural decoders for quantum error correction on surface codes can exploit syndrome count~$K$---the number of triggered detectors---as a statistical shortcut, encoding density information into representations intended for spatial error topology. This \emph{K-leakage} confounds training diagnostics and may reduce the robustness benefits that motivate learned decoders over conventional matching-based methods. We report a systematic study of K-leakage mitigation in a bipartite factor-graph decoder trained on surface codes with correlated crosstalk noise. Across 28 development iterations, we evaluated 14 mitigation mechanisms spanning five families: global decorrelation, null-space alignment, K-orthogonalization, gradient shielding, and architectural factorization. None reliably reduced K-leakage while preserving topology across seeds at the required effect size---a consequence, our analysis indicates, of syndrome count being physically meaningful rather than purely spurious, so that interventions targeting global $Z$--$K$ dependence inevitably damage legitimate covariance.
+
+We introduce ExactK, an auxiliary iso-$K$ hinge loss that mines training pairs exclusively from samples sharing identical syndrome count ($\Delta K = 0$). Because within-pair $K$ variation is removed by construction, ranking improvements under the auxiliary loss cannot be explained by pairwise $K$ differences. In the tested regime ($d{=}5$, $d{=}7$, $p{=}0.04$, correlated noise), ExactK reduces linear $K$-leakage by $31.2\%$ at $d{=}5$ (paired bootstrap 95\% CI: $[-46.3\%, 61.2\%]$, 10~seeds), $23.4\%$ at $d{=}7$ with the same hyperparameters (paired bootstrap 95\% CI: $[-51.4\%, 51.4\%]$, 10~seeds), and $45.0\%$ on unseen holdout seeds (paired bootstrap 95\% CI: $[-31.9\%, 60.7\%]$), with zero topology collapses across all validated ExactK experiments. The mechanism operates entirely in the forward pass, requiring no gradient surgery, no architectural modification, and no adversarial training.
+\end{abstract}
+
+\maketitle

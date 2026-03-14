@@ -1,0 +1,74 @@
+% ══════════════════════════════════════════════════════════════════════
+% Section 1: Introduction
+% ══════════════════════════════════════════════════════════════════════
+
+\section{Introduction}
+
+\subsection{QEC Decoding and the Oracle Advantage}
+
+Fault-tolerant quantum computing requires quantum error correction (QEC), in which redundantly encoded logical qubits are protected by repeated syndrome measurement and real-time decoding~\cite{PLACEHOLDER_qec_review}. The surface code~\cite{PLACEHOLDER_surface_code} is the leading candidate architecture for near-term implementations, owing to its high threshold under local noise and its planar layout compatible with superconducting qubit hardware.
+
+The standard decoder for surface codes is minimum-weight perfect matching (MWPM)~\cite{PLACEHOLDER_mwpm}, which constructs a matching graph from the \emph{detector error model} (DEM)---a complete probabilistic description of which errors trigger which detectors and with what probability. MWPM's strength is precisely its \emph{oracle advantage}: it operates on exact knowledge of the noise structure. When the DEM is accurate, MWPM is efficient, well-understood, and provably optimal for independent Pauli noise on the matching graph~\cite{PLACEHOLDER_mwpm_optimality}.
+
+Neural decoders offer a complementary approach. Rather than requiring an explicit DEM, a learned decoder can in principle extract decoding strategies directly from syndrome data~\cite{PLACEHOLDER_nn_decoder_survey}. This is appealing in settings where the noise model is uncertain, drifts over time, or contains correlations that MWPM approximates only through clique expansion of hyperedges~\cite{PLACEHOLDER_correlated_noise}. Recent work has demonstrated neural decoders based on multi-layer perceptrons~\cite{PLACEHOLDER_mlp_decoder}, graph neural networks~\cite{PLACEHOLDER_gnn_decoder}, recurrent architectures~\cite{PLACEHOLDER_rnn_decoder}, and transformers~\cite{PLACEHOLDER_transformer_decoder}, with several approaching MWPM accuracy on specific benchmarks.
+
+However, the flexibility that allows neural decoders to learn from data also allows them to learn \emph{shortcuts}~\cite{PLACEHOLDER_shortcut_learning}. In particular, syndrome count~$K$---the total number of triggered detectors in a given measurement round---is a strong statistical predictor of the logical error probability $P(\text{error} \mid K)$. A decoder that simply learns this density lookup, without extracting any spatial structure from the syndrome pattern, can achieve deceptively good in-distribution accuracy while failing to generalize and offering no advantage over a trivial baseline.
+
+\subsection{The $K$-Leakage Problem}
+\label{sec:kleakage}
+
+We define \emph{K-leakage} as the presence of syndrome-count information in the model's topology-intended internal representation. In our decoder architecture (Section~\ref{sec:background}), the model output is decomposed as
+\begin{equation}
+\hat{y} = f_{\text{prior}}(K) + \alpha \cdot z,
+\end{equation}
+where $f_{\text{prior}}(K)$ is a frozen density lookup and $z$ is the \emph{residual logit}---the normalized output of the topology channel after K-conditional standardization. The residual $z$ is intended to capture spatial error structure only. K-leakage occurs when $z$ still encodes~$K$, so that the model's supposed topology signal partly reduces to a density shortcut.
+
+To measure K-leakage, we use a \emph{linear probe score}~$G_1$, defined as the five-fold cross-validated $R^2$ of a Ridge regression $z \to K$ evaluated on an independent held-out probe set of $N{=}4096$ samples. The probe input is the exact tensor used by the model for prediction---the normalized residual logit after removal of the density prior. $G_1 \in [0, 1]$, where $G_1{=}0$ indicates no linear $K$-information in~$z$. In the later selector-era analyses, values below $0.015$ define the ``organic clean'' regime in which the residual carries negligible linear $K$-dependence; earlier Day~55 stabilization used a stricter historical pass threshold of $0.01$ for probe qualification.
+
+We emphasize that $G_1$ captures \emph{linear} leakage only. Earlier diagnostics using a nonlinear probe (a two-layer MLP trained to predict $K$ from~$z$) revealed that nonlinear $K$-predictability persists even when the linear component is fully removed. $G_1$ should therefore be understood as a \emph{conservative lower bound} on total K-leakage---it measures the dominant mode reliably and transparently, but does not capture higher-order dependence. The linear probe was adopted because it proved substantially more stable across epochs than the MLP probe, which exhibited order-of-magnitude fluctuations that rendered it unsuitable for epoch-level monitoring.
+
+K-leakage is problematic for several reasons. It inflates apparent in-distribution performance, since $K$ is predictive of $Y$ independently of topology. It may degrade out-of-distribution robustness in settings where the $K$--$Y$ relationship shifts. And it obscures the degree to which the decoder has learned genuine spatial structure, making it difficult to assess whether a neural decoder offers any advantage over a density-only baseline.
+
+\subsection{Prior Mitigation Attempts: A Systematic Falsification}
+\label{sec:prior_attempts}
+
+Over the course of this project, we evaluated 14~distinct mechanisms for reducing K-leakage, drawn from five methodological families. Each mechanism was tested on 3--10 random seeds with explicit topology safety checks (absence of topology collapse, defined as a significant degradation of within-$K$-slice predictive structure under $K$-matched scrambling). Table~\ref{tab:families} summarizes the families, their best outcomes, and their primary failure modes.
+
+\begin{table*}
+\caption{K-leakage mitigation families tested prior to ExactK. All 14 mechanisms failed to achieve reliable leakage reduction while preserving topology across seeds at the required effect size.}
+\label{tab:families}
+\renewcommand{\arraystretch}{1.3}
+\centering
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l l l @{}}
+\hline\hline
+Family & Mechanisms tested & Best outcome & Primary failure mode \\
+\hline
+Global reg./decorrelation & \makecell[l]{$\Corr(Z,K)^2$, GRL,\\hysteresis gating} & $+13.6\%$ $G_1$ reduction & \makecell[l]{Cannot separate physics\\from shortcut $K$-dep.} \\[4pt]
+Null-space alignment & Null-space loss (4 variants) & Solved on 1/3 seeds & Seed-dependent topology loss \\[4pt]
+K-orthogonalization & \makecell[l]{Rolling/EMA/frozen/\\epoch/ProbeSet $\beta$} & $-14\%$ to $-56\%$ (worse) & \makecell[l]{$\beta$ estimation too\\noisy or stale} \\[4pt]
+Gradient shielding & \makecell[l]{Hard/soft/adaptive\\projection} & \makecell[l]{$+59.3\%$ (3 seeds);\\$-54.2\%$ (10 seeds)} & \makecell[l]{$K$-gradient carries topology\\on ${\sim}50\%$ of seeds} \\[4pt]
+Arch.\ factorization & \makecell[l]{Split head +\\nuisance siphon} & $+29.9\%$ (1 collapse) & \makecell[l]{Siphon inert; regularizer\\was active ingredient} \\
+\hline\hline
+\end{tabular*}
+\renewcommand{\arraystretch}{1.0}
+\end{table*}
+
+The central lesson from this falsification sequence is that syndrome count~$K$ is \emph{physically meaningful} in surface-code decoding: higher $K$ genuinely correlates with higher error probability because more syndrome triggers indicate more physical errors. Any intervention that penalizes the \emph{global} dependence between $z$ and $K$---whether through correlation penalties, adversarial training, gradient projection, or representation factorization---risks destroying legitimate covariance alongside the shortcut. Gradient shielding illustrated this most directly: projecting out the $K$-collinear component of the gradient improved leakage on seeds where the leakage was purely parasitic, but damaged topology on seeds where the $K$-collinear gradient carried genuine structural information.
+
+K-orthogonalization ($\beta$ subtraction) failed for a different reason: estimating the linear regression coefficient $\beta$ between $z$ and $K$ from per-batch or per-epoch statistics proved fundamentally unreliable at the available sample sizes ($B{=}64$--$128$). The estimate was either too noisy (per-batch), too stale (frozen across epochs), or gated to inactivity by conservative safety thresholds.
+
+These failures motivated a qualitatively different approach: rather than penalizing \emph{global} $Z$--$K$ dependence, restrict comparisons to samples with \emph{identical}~$K$, so that the auxiliary training signal carries no within-pair $K$ variation by construction.
+
+\subsection{Contributions}
+
+This paper makes the following contributions:
+
+\begin{enumerate}
+\item \textbf{ExactK iso-$K$ hinge loss.} We introduce an auxiliary forward-pass loss that mines training pairs exclusively from samples sharing identical syndrome count ($\Delta K{=}0$) and applies a hinge-margin ranking objective within these pairs. Because within-pair $K$ variation is removed by construction, ranking improvements under the iso-$K$ loss cannot be explained by pairwise $K$ differences. The mechanism requires no gradient surgery, no architectural modification, and no adversarial training---only a pair-mining step within each batch (Section~\ref{sec:method}).
+
+\item \textbf{Systematic negative results.} We document the failure modes of 14 prior mechanisms across 5~families, providing a structured account of why global decorrelation, orthogonalization, and gradient shielding are unreliable for K-leakage reduction in QEC decoders. The root-cause analysis---that $K$ carries physically meaningful information that these methods cannot separate from shortcut dependence---motivates the local, within-$K$ design of ExactK (Section~\ref{sec:prior_mitigation}, Appendix~\ref{app:negative}).
+
+\item \textbf{Multi-scale validation within the tested regime.} We validate ExactK at code distance $d{=}5$ (10~seeds, $+31.2\%$ median $G_1$ reduction), at $d{=}7$ using identical hyperparameters (10~seeds, $+23.4\%$), and on 10 unseen holdout seeds at $d{=}7$ ($+45.0\%$), with zero topology collapses across the 30-seed Day~69/70/75 validation suite and 960/960 alignment checks passing. All experiments use surface codes with correlated crosstalk noise at $p{=}0.04$ (Section~\ref{sec:experiments}).
+
+\item \textbf{Checkpoint selection methodology.} We identify the \emph{Asymmetric Selection Paradox}---a pitfall in which multi-objective checkpoint selectors with heterogeneous pool criteria produce misleading inter-arm comparisons---and present a topology-aware selector that decouples leakage-reduction assessment from deployment checkpoint choice (Section~\ref{sec:selector}).
+\end{enumerate}

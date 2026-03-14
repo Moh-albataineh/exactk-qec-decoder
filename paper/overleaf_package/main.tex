@@ -1,0 +1,57 @@
+\documentclass[aps,prx,reprint,superscriptaddress,longbibliography]{revtex4-2}
+
+% ── Encoding & fonts ──
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+
+% ── Math ──
+\usepackage{amsmath,amssymb,amsfonts}
+
+% ── Tables ──
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{dcolumn}
+\usepackage{makecell}
+
+% ── Graphics ──
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+
+% ── Code listings ──
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+}
+
+% ── Misc ──
+\usepackage{xcolor}
+
+% ── Custom commands ──
+\newcommand{\Corr}{\mathrm{Corr}}
+\newcommand{\SliceC}{\mathrm{SliceC}}
+\newcommand{\TG}{\mathrm{TG}}
+\newcommand{\sg}{\mathrm{sg}}
+
+% ══════════════════════════════════════════════════════════════════════
+\begin{document}
+
+\input{sections/frontmatter}
+\input{sections/sec1_introduction}
+\input{sections/sec2_background}
+\input{sections/sec3_method}
+\input{sections/sec4_experiments}
+\input{sections/sec5_selector}
+\input{sections/sec6_related}
+\input{sections/sec7_discussion}
+\input{sections/sec8_conclusion}
+\input{sections/endmatter}
+\input{sections/appendices}
+
+\bibliography{references}
+
+\end{document}
