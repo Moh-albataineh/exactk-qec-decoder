@@ -141,6 +141,7 @@ See [`docs/REPO_LAYOUT.md`](docs/REPO_LAYOUT.md) for the full annotated tree. Ke
   author  = {Albataineh, Mohammad},
   year    = {2026},
   version = {1.0.0},
+  doi     = {10.5281/zenodo.19023672},
   url     = {https://github.com/Moh-albataineh/exactk-qec-decoder}
 }
 ```

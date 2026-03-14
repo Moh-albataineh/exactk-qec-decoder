@@ -1,11 +1,12 @@
 cff-version: 1.2.0
-title: "ExactK: Iso-K Hinge Loss for K-Leakage-Free QEC Decoding"
+title: "ExactK: Iso-K Hinge Loss for Robust K-Leakage Reduction in QEC Neural Decoders"
 message: "If you use this software, please cite it as below."
 type: software
 version: 1.0.0
 date-released: "2026-03-03"
 license: MIT
 repository-code: "https://github.com/Moh-albataineh/exactk-qec-decoder"
+doi: "10.5281/zenodo.19023672"
 authors:
   - family-names: Albataineh
     given-names: Mohammad
