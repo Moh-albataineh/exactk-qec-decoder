@@ -77,8 +77,8 @@ python -m pytest tests/ -v
 | Experiment | Command | Time (GPU) |
 |------------|---------|------------|
 | d=5 (10 seeds) | `bash scripts/reproduce/repro_day69_d5.sh` | ~10-15 min |
-| d=7 OOD (10 seeds) | `bash scripts/reproduce/repro_day70_d7.sh` | ~4 hours |
-| Holdout (10 seeds) | `bash scripts/reproduce/repro_day75_holdout.sh` | ~4 hours |
+| d=7 OOD (10 seeds) | `bash scripts/reproduce/repro_day70_d7.sh` | ~20-30 min |
+| Holdout (10 seeds) | `bash scripts/reproduce/repro_day75_holdout.sh` | ~20-30 min |
 | Selector + KPIs | `bash scripts/reproduce/run_selector_v6.sh` | ~1 min |
 
 > **Note**: Canonical results are from the validated reference environment. Re-running on different hardware may yield numerically different results due to floating-point non-determinism. A reproduction is successful if it preserves the same verdict, safety invariants, and qualitatively similar effect size. See [`docs/REPRO_POLICY.md`](docs/REPRO_POLICY.md).
