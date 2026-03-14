@@ -17,7 +17,7 @@ See [`docs/AI_DISCLOSURE.md`](docs/AI_DISCLOSURE.md) for details.
 This repository is a **research artifact and paper companion** for the ExactK manuscript. It contains:
 
 - The complete source code for the bipartite factor-graph decoder and ExactK loss
-- Reproduction scripts for all key experiments (d=5, d=7, holdout)
+- Reproduction scripts for all key experiments ($d{=}5$, $d{=}7$, holdout)
 - The final manuscript LaTeX source and figures
 - 75 days of development documentation and provenance
 
@@ -25,23 +25,25 @@ This repository is a **research artifact and paper companion** for the ExactK ma
 
 ## Main Results (V1.0 Holdout — Day 75)
 
+Validated results include $+31.2\%$ at $d{=}5$, $+23.4\%$ at $d{=}7$ OOD, and $+45.0\%$ on the Day 75 holdout suite.
+
 | KPI | Value | Target | Status |
 |-----|-------|--------|--------|
-| Science Δ (epoch-median G₁) | **+45.0%** | ≥ 20% | Pass |
+| Science Δ (epoch-median $G_1$) | **+45.0%** | ≥ 20% | Pass |
 | Safe Yield (Prod CLEAN) | **80%** (8/10) | ≥ 80% | Pass |
 | TOPO_FAIL | **0/10** | ≤ 10% | Pass |
 | KPI-B: Leaky cohort improvement | **+15.1%** (83% wins) | > 0 | Pass |
 | Do-No-Harm violations | **0** | 0 | Pass |
 
-Validated on 10 unseen holdout seeds (60000–60009) at d=7, p=0.04, correlated crosstalk noise.
+Validated on 10 unseen holdout seeds (60000–60009) at $d{=}7$, $p{=}0.04$, correlated crosstalk noise.
 
-**Prior to ExactK**, 14 mitigation mechanisms across 5 families (global decorrelation, null-space alignment, K-orthogonalization, gradient shielding, architectural factorization) were tested over 28 development days. None reliably reduced K-leakage while preserving topology signal across seeds at the required effect size.
+**Prior to ExactK**, 14 mitigation mechanisms across 5 families (global decorrelation, null-space alignment, $K$-orthogonalization, gradient shielding, architectural factorization) were tested over 28 development days. None reliably reduced $K$-leakage while preserving topology signal across seeds at the required effect size.
 
 ---
 
 ## What is ExactK?
 
-Syndrome count $K$ (the number of triggered detectors) is a strong statistical predictor of logical error probability in surface codes. Neural decoders can exploit this as a shortcut, encoding density information into representations intended for spatial topology — a phenomenon we call **K-leakage**.
+Syndrome count $K$ (the number of triggered detectors) is a strong statistical predictor of logical error probability in surface codes. Neural decoders can exploit this as a shortcut, encoding density information into representations intended for spatial topology — a phenomenon we call **$K$-leakage**.
 
 ExactK addresses this by adding an auxiliary hinge-margin ranking loss that mines training pairs exclusively from samples sharing identical $K$. Because within-pair $K$ variation is zero by construction, the model can only improve on this loss by learning genuine spatial structure, not syndrome-count shortcuts.
 
@@ -135,7 +137,7 @@ See [`docs/REPO_LAYOUT.md`](docs/REPO_LAYOUT.md) for the full annotated tree. Ke
 
 ```bibtex
 @software{albataineh2026exactk,
-  title   = {ExactK: Iso-K Hinge Loss for K-Leakage-Free QEC Decoding},
+  title   = {ExactK: Iso-K Hinge Loss for Robust K-Leakage Reduction in QEC Neural Decoders},
   author  = {Albataineh, Mohammad},
   year    = {2026},
   version = {1.0.0},
